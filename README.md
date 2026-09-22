@@ -22,12 +22,17 @@ Canonical docs:
 | [docs/product-brief.md](docs/product-brief.md) | Problem, users, principles, non-goals, success criteria |
 | [docs/architecture.md](docs/architecture.md) | Host vs provider boundary, feed/playback model, seams |
 | [docs/roadmap.md](docs/roadmap.md) | Milestones, risks, decision gates |
+| [docs/operator-ytzero.md](docs/operator-ytzero.md) | Run and customize YT Zero from this repo |
 | [docs/decisions/0001-ytzero-provider.md](docs/decisions/0001-ytzero-provider.md) | Why YT Zero is the first provider pin |
 
 ## Repository layout
 
 ```text
 wonderfeed/
+  cmd/wonderfeed/    # host operator CLI
+  internal/          # host libraries (provider ops, errors)
+  deploy/ytzero/     # host compose overlay and env template
+  data/ytzero/       # local provider data (gitignored)
   providers/
     ytzero/          # git submodule: Pelski/ytzero (do not spill host policy here)
   docs/              # product and architecture documentation
@@ -55,23 +60,35 @@ After updating the packs pin, refresh Cursor links:
 bash .cursor/packs/shared/scripts/link-into-project.sh --project .
 ```
 
+## Run the provider (Milestone 1)
+
+```bash
+make build
+make serve
+make provider-health
+```
+
+Open http://127.0.0.1:3001. Stop with `make serve-down` (data kept). Full operator notes: [docs/operator-ytzero.md](docs/operator-ytzero.md).
+
 ## Provider boundary (critical)
 
 - Treat `providers/ytzero` as an independent repository.
 - Put Wonderfeed-specific skills, brand, policy, and private paths in this host only.
 - Prefer wrapping, adapting, or composing the provider over editing upstream for product needs.
-- See repository-boundary rules in `.cursor/rules/repository-boundaries.mdc` and the host skill `.cursor/skills/wonderfeed-provider-integration/`.
+- See repository-boundary rules in `.cursor/rules/repository-boundaries.mdc` and the host skills `.cursor/skills/wonderfeed-provider-integration/` and `.cursor/skills/wonderfeed-ytzero-ops/`.
 
 ## Current status
 
-Scaffold only:
+Milestone 1 ops scaffold:
 
-- Public host repository and feature docs.
+- Public host repository and product docs.
 - YT Zero pinned as a provider submodule.
-- Host Cursor skills for product context, provider integration, and content policy.
+- Host Cursor skills for product context, provider integration, content policy, and YT Zero ops.
+- Host Go CLI (`wonderfeed`) and compose overlay to run the provider without writing into the submodule.
 
-Runtime language, deployment shape, authentication, and the exact child-facing UI are **not** decided yet. See the [roadmap](docs/roadmap.md).
+Runtime control plane, authentication product model, and the exact child-facing UI are **not** decided yet. See the [roadmap](docs/roadmap.md).
 
 ## License note
 
-Host documentation and skills in this repository are authored for Wonderfeed. The `providers/ytzero` tree remains under its upstream license (AGPL-3.0). Treat provider license obligations carefully before shipping derived binaries or services.
+Host documentation, skills, and Go tooling in this repository are authored for Wonderfeed. The `providers/ytzero` tree remains under its upstream license (AGPL-3.0). Treat provider license obligations carefully before shipping derived binaries or services. Prefer the Docker/HTTP process boundary documented in [docs/operator-ytzero.md](docs/operator-ytzero.md).
+

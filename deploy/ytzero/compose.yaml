@@ -1,0 +1,24 @@
+# Host-owned YT Zero overlay. Data lives under data/ytzero/, not in the submodule.
+# Image tag tracks the providers/ytzero release label; override with YTZERO_IMAGE.
+services:
+  ytzero:
+    image: ${YTZERO_IMAGE:-ghcr.io/pelski/ytzero:2026.09.8}
+    container_name: wonderfeed-ytzero
+    ports:
+      - "${YTZERO_HOST_PORT:-3001}:3001"
+    volumes:
+      - ../../data/ytzero:/data
+    env_file:
+      - .env
+    environment:
+      PORT: "3001"
+      IDLE_TIMEOUT_SECONDS: ${IDLE_TIMEOUT_SECONDS:-120}
+      REFRESH_INTERVAL_MINUTES: ${REFRESH_INTERVAL_MINUTES:-5}
+      FULL_SYNC_INTERVAL_MINUTES: ${FULL_SYNC_INTERVAL_MINUTES:-15}
+      VIDEO_MAINTENANCE_MAX_AGE_DAYS: ${VIDEO_MAINTENANCE_MAX_AGE_DAYS:-90}
+      DB_PATH: /data/db/ytzero.db
+      IMG_CACHE_DIR: /data/imgcache
+      LOG_PATH: /data/logs/ytzero.log
+      DOWNLOADS_DIR: /data/downloads
+      DOWNLOAD_COOKIES_DIR: /data/download-cookies
+    restart: unless-stopped

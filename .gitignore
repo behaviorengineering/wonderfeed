@@ -15,12 +15,17 @@ logs/
 .env.*
 !.env.example
 
+# Host provider runtime data (never store under providers/ytzero)
+data/ytzero/**
+!data/ytzero/.gitkeep
+deploy/ytzero/.env
+
 # Node (provider or future host tooling)
 node_modules/
 npm-debug.log*
 yarn-error.log*
 
-# Go (future host binaries)
+# Go host binaries
 bin/
 *.exe
 *.test
