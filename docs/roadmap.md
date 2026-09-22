@@ -6,7 +6,7 @@
 - [x] Provider submodule `providers/ytzero`
 - [x] Product brief, architecture, roadmap, and provider decision record
 - [x] Host Cursor skills for product context, provider integration, and content policy
-- [ ] Merge scaffold PR and verify clean-clone with recursive submodules
+- [x] Merge scaffold PR and verify clean-clone with recursive submodules
 
 **Exit gate:** a new contributor can clone, init submodules, and explain what Wonderfeed owns versus YT Zero.
 
