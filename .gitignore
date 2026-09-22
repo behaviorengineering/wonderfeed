@@ -1,0 +1,35 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor / local tooling
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Local scratch and generated artifacts
+tmp/
+logs/
+.env
+.env.*
+!.env.example
+
+# Node (provider or future host tooling)
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Go (future host binaries)
+bin/
+*.exe
+*.test
+*.out
+
+# Python (future host tooling)
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/

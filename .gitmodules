@@ -1,0 +1,6 @@
+[submodule ".cursor/packs/shared"]
+	path = .cursor/packs/shared
+	url = https://github.com/xynova/cursor-packs.git
+[submodule "providers/ytzero"]
+	path = providers/ytzero
+	url = https://github.com/Pelski/ytzero.git
