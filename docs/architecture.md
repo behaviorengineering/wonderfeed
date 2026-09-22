@@ -2,14 +2,15 @@
 
 ## Current shape
 
-Wonderfeed is a **host repository** with provider submodules. There is not yet a Wonderfeed runtime service, database, or CLI. The architecture docs define ownership and seams so later implementation does not blur them.
+Wonderfeed is a **host repository** with provider submodules. A small host Go CLI and Docker Compose overlay can run the pinned YT Zero provider locally. There is not yet a Wonderfeed control-plane database or child-facing product UI. The architecture docs define ownership and seams so later implementation does not blur them.
 
 ```text
 Parent policy and product docs
+  -> Wonderfeed host CLI / deploy overlay (ops)
   -> Wonderfeed host-owned adapter and future control plane
-  -> YT Zero provider boundary at providers/ytzero
-  -> provider-owned feed state and playback links
-  -> future child-facing presentation
+    -> YT Zero provider boundary at providers/ytzero
+    -> provider-owned feed state and playback links
+    -> future child-facing presentation
 ```
 
 ## Ownership boundary
@@ -17,7 +18,8 @@ Parent policy and product docs
 | Concern | Owner today | Notes |
 | --- | --- | --- |
 | Product principles, roadmap, parent UX intent | Wonderfeed host | Docs and host skills under this repo |
-| Subscription inbox, tags, rules, profiles, local DB | YT Zero provider | Source at `providers/ytzero` |
+| Local provider run (compose, env, data dir, health) | Wonderfeed host | `deploy/ytzero/`, `data/ytzero/`, `cmd/wonderfeed` |
+| Subscription inbox, tags, rules, profiles, local DB | YT Zero provider | Source at `providers/ytzero`; runtime data mounted from host |
 | Device lockdown / kiosk / DNS blocks | Outside app (OS, browser profile, network) | Required for real child enforcement |
 | YouTube embed chrome and related videos | YouTube platform | Not fully removable via embed params |
 | Premium / ad-free entitlement | Signed-in YouTube session in the playback browser | Separate from Wonderfeed curation |
@@ -60,7 +62,7 @@ These are the places a future host adapter will touch first:
 4. **Profile and limit APIs** — map Wonderfeed parent policy onto provider profiles when wrapping.
 5. **Playback handoff** — approved `videoId` into an embed or provider player, never unrestricted search.
 
-No registry, DI container, or host database exists yet. When those arrive, document registration order in a plan that follows `.cursor/skills/plan-scaffold/`.
+No registry, DI container, or host control-plane database exists yet. Host ops for the provider are documented in [operator-ytzero.md](operator-ytzero.md). When control-plane registration arrives, document order in a plan that follows `.cursor/skills/plan-scaffold/`.
 
 ## Explicit limitations
 

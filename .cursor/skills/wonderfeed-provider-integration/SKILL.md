@@ -17,6 +17,8 @@ Related:
 
 - [docs/architecture.md](../../../docs/architecture.md)
 - [docs/decisions/0001-ytzero-provider.md](../../../docs/decisions/0001-ytzero-provider.md)
+- [docs/operator-ytzero.md](../../../docs/operator-ytzero.md)
+- `.cursor/skills/wonderfeed-ytzero-ops/SKILL.md` (run/customize from host)
 - `.cursor/rules/repository-boundaries.mdc`
 - `.cursor/skills/sync-submodules-after-merge/`
 
@@ -71,8 +73,9 @@ Violation: STOP, write or update an ADR, re-verify.
 
 1. **Resolve ownership** — confirm whether the path is host or provider.
 2. **Refuse spill** — if the request is product-specific, keep changes on the host.
-3. **Pin consciously** — when updating YT Zero, bump the gitlink and note license/behavior impact.
-4. **Sync cleanly** — after merge or pin bump, follow recursive submodule update practice so clones are not falsely dirty.
+3. **Operate from host** — for run/stop/health/env, follow `wonderfeed-ytzero-ops` (`make serve`, `deploy/ytzero/`), not ad-hoc submodule compose.
+4. **Pin consciously** — when updating YT Zero, bump the gitlink and align `YTZERO_IMAGE` in the host overlay; note license/behavior impact.
+5. **Sync cleanly** — after merge or pin bump, follow recursive submodule update practice so clones are not falsely dirty.
 
 ## Pre-completion checklist
 

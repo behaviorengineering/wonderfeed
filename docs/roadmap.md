@@ -12,12 +12,21 @@
 
 ## Milestone 1: Operate the provider as-is
 
-- Run YT Zero locally (Docker Compose or documented upstream path).
-- Import a small trusted channel set for a trial household.
-- Exercise child profile, subscribed-content-only mode, Shorts/live gating, and watch-time limits.
-- Record gaps relative to Wonderfeed principles (approval requests, diversity rules, child UI lock strength).
+- [x] Host compose overlay and Go CLI to run YT Zero without writing into the submodule
+- [ ] Run YT Zero locally via `make serve` (Docker required)
+- [ ] Import a small trusted channel set for a trial household
+- [ ] Exercise child profile, subscribed-content-only mode, Shorts/live gating, and watch-time limits
+- [ ] Record gaps relative to Wonderfeed principles (approval requests, diversity rules, child UI lock strength)
+
+**Gap list template** (fill during the trial; separate "configure YT Zero" from "must build in Wonderfeed"):
+
+| Gap | Configure in YT Zero? | Must build on Wonderfeed host? | Notes |
+| --- | --- | --- | --- |
+| | | | |
 
 **Exit gate:** written gap list that separates "configure YT Zero" from "must build in Wonderfeed."
+
+Operator runbook: [operator-ytzero.md](operator-ytzero.md).
 
 ## Milestone 2: Choose the integration shape
 
