@@ -13,7 +13,7 @@ Remote access design (Cloudflare Tunnel, school rollouts): [`cloudflare.md`](clo
 
 ## Quick start
 
-`make serve` / `make provider-up` build a **src-patch** image (pinned release layers + current `providers/ytzero/app/src`) so PostgreSQL cold start works. Upstream `2026.09.8` alone crash-loops on empty Postgres (image_cache import race and table-level FOREIGN KEY translation).
+`make serve` / `make provider-up` build a **src-patch** image (pinned release layers + `deploy/ytzero/src-overlay` Postgres cold-start fixes) so empty Postgres boots cleanly. Upstream `2026.09.8` alone crash-loops (image_cache import race and table-level FOREIGN KEY translation).
 
 Interactive (process-compose TUI):
 
@@ -104,12 +104,13 @@ This overlay always sets `DATABASE_URL`. Upstream YT Zero will initialize a **ne
 
 | Pin | Meaning |
 | --- | --- |
-| Git submodule `providers/ytzero` | Source and docs reference for the accepted ADR pin (includes portable Postgres cold-start fixes on the local branch until upstream merges) |
-| `make provider-image` → `wonderfeed-ytzero:src-patch` | Host default runtime: `Dockerfile.src-patch` copies submodule `app/src` onto `ghcr.io/pelski/ytzero:2026.09.8` |
+| Git submodule `providers/ytzero` | Source and docs reference for the accepted ADR pin (`2026.09.8` / matching SHA) |
+| `deploy/ytzero/src-overlay/` | Host-owned Postgres cold-start patches applied by `Dockerfile.src-patch` until upstream ships them |
+| `make provider-image` → `wonderfeed-ytzero:src-patch` | Host default runtime: base `ghcr.io/pelski/ytzero:2026.09.8` + src-overlay |
 | Compose `YTZERO_IMAGE` | Override; `.env.example` defaults to `wonderfeed-ytzero:src-patch` |
 | Compose `POSTGRES_IMAGE` (default `postgres:17-alpine`) | Runtime database image |
 
-After changing submodule app sources, re-run `make provider-image` (or `make provider-up` / `make serve`, which rebuild).
+After changing `deploy/ytzero/src-overlay/`, re-run `make provider-image` (or `make provider-up` / `make serve`, which rebuild).
 
 ## Boundary
 

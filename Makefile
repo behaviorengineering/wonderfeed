@@ -26,8 +26,8 @@ tidy: ## Run go mod tidy
 format: ## Format Go sources
 	$(GO) fmt ./...
 
-# Patched app sources on top of the pinned release image (Postgres cold-start fixes).
-provider-image: ## Build wonderfeed-ytzero:src-patch from providers/ytzero
+# Patched overlay on top of the pinned release image (Postgres cold-start fixes).
+provider-image: ## Build wonderfeed-ytzero:src-patch from deploy/ytzero/src-overlay
 	docker build -f deploy/ytzero/Dockerfile.src-patch -t wonderfeed-ytzero:src-patch .
 
 serve: provider-image ## process-compose TUI for PostgreSQL + YT Zero
