@@ -17,6 +17,7 @@ type StatusReport struct {
 	Root           string
 	ComposeFile    string
 	DataDir        string
+	PostgresDir    string
 	ProviderDir    string
 	ProviderHEAD   string
 	ProviderDesc   string
@@ -36,6 +37,7 @@ func CollectStatus(ctx context.Context, paths Paths, baseURL string) (StatusRepo
 		Root:           paths.Root,
 		ComposeFile:    paths.ComposeFile,
 		DataDir:        paths.DataDir,
+		PostgresDir:    paths.PostgresDir,
 		ProviderDir:    paths.ProviderDir,
 		BaseURL:        baseURL,
 		EnvFilePresent: fileExists(paths.EnvFile),
@@ -56,13 +58,14 @@ func CollectStatus(ctx context.Context, paths Paths, baseURL string) (StatusRepo
 	return report, nil
 }
 
-var statusTmpl = template.Must(template.New("status").Parse(`Provider: YT Zero
+var statusTmpl = template.Must(template.New("status").Parse(`Provider: YT Zero (PostgreSQL)
 Root: {{.Root}}
 Submodule: {{.ProviderDir}}
   HEAD: {{.ProviderHEAD}}
   Describe: {{.ProviderDesc}}
 Compose: {{.ComposeFile}}
-Data: {{.DataDir}}
+App data: {{.DataDir}}
+Postgres data: {{.PostgresDir}}
 Env file: {{if .EnvFilePresent}}present{{else}}missing (will copy from .env.example on up){{end}}
 Base URL: {{.BaseURL}}
 {{if .ComposeErr}}Compose ps: unavailable ({{.ComposeErr}})

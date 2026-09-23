@@ -1,0 +1,30 @@
+version: "0.5"
+
+# Interactive operator surface for the Wonderfeed home provider stack.
+# Docker Compose owns postgres + ytzero containers; process-compose owns the TUI lifecycle.
+# Launch from the repository root (scripts/pc-up.sh does this).
+
+processes:
+  provider-stack:
+    description: YT Zero + PostgreSQL via host compose overlay
+    environment:
+      - "YTZERO_IMAGE=${YTZERO_IMAGE:-wonderfeed-ytzero:src-patch}"
+    command: >
+      docker compose
+      -p wonderfeed-ytzero
+      -f deploy/ytzero/compose.yaml
+      up
+      --remove-orphans
+    shutdown:
+      command: >
+        docker compose
+        -p wonderfeed-ytzero
+        -f deploy/ytzero/compose.yaml
+        down
+        --remove-orphans
+      timeout_seconds: 60
+    availability:
+      restart: "on_failure"
+      backoff_seconds: 3
+      max_restarts: 5
+    namespace: provider

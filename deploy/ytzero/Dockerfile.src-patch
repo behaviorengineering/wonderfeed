@@ -1,0 +1,7 @@
+# Rebuild YT Zero app sources on top of the pinned release image.
+# Overlay holds portable Postgres cold-start fixes until upstream ships them.
+# Build from repo root:
+#   docker build -f deploy/ytzero/Dockerfile.src-patch -t wonderfeed-ytzero:src-patch .
+ARG YTZERO_BASE=ghcr.io/pelski/ytzero:2026.09.8
+FROM ${YTZERO_BASE}
+COPY deploy/ytzero/src-overlay/ /app/src/

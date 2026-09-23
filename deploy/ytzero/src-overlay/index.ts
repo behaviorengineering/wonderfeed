@@ -1,0 +1,140 @@
+import { Hono } from "hono";
+import { serveStatic } from "hono/bun";
+// Load db before routes so PostgreSQL cold-start migration finishes before
+// route modules (imgcache) touch the public schema. Keep this order.
+import { db, getSetting, reloadSettingCache } from "./db";
+import { api } from "./routes";
+import { database, databaseConfig } from "./database";
+import { startSQLiteMaintenance } from "./sqliteMaintenance";
+import { startScheduler } from "./refreshScheduler";
+import { startDownloader } from "./downloader";
+import { log } from "./logger";
+import { COMMIT, VERSION } from "./version";
+import { createAppIconPng, createAppIconSvg } from "./app-icon";
+import { createAppManifest } from "./app-manifest";
+import { collectDiagnosticSnapshot } from "./diagnostics";
+import { migrateLegacyProfileAvatars } from "./profileAvatars";
+import { flushTubeArchivistWatched, scheduleTubeArchivistSync } from "./tubeArchivist";
+import { environmentAuthMethod, environmentAuthPasswordConfigured } from "./authEnvironment";
+import { startAppEventRelay } from "./appEvents";
+import { deploymentMode } from "./deploymentMode";
+import { reloadPluginEnabledCache } from "./plugins";
+import { startClusterHeartbeat } from "./clusterRuntime";
+import { createPublicShareRouter } from "./routes/publicShareRoutes";
+
+if (environmentAuthMethod() && !environmentAuthPasswordConfigured()) {
+  log.error("auth.environment_password_missing", {
+    method: "shared",
+    variable: "YTZERO_AUTH_PASSWORD",
+  });
+}
+
+const app = new Hono();
+// Serve the built UI (ui/dist is copied to ./public in the Docker image,
+// or set UI_DIST when running locally).
+const uiDir = process.env.UI_DIST ?? "./public";
+
+// Health probe for container runtimes, reverse proxies and installers. Declared
+// before the API router so the session middleware never sees it — probes have no
+// cookies and must not depend on the configured auth method.
+app.get("/api/health", async (c) => {
+  try {
+    await database.query("SELECT 1").get();
+  } catch (err) {
+    log.error("health.db", { error: String(err) });
+    return c.json({ status: "error", version: VERSION, commit: COMMIT }, 503);
+  }
+  const mode = deploymentMode(databaseConfig.engine);
+  return c.json({ status: "ok", version: VERSION, commit: COMMIT, uptime: Math.round(process.uptime()), database: mode.database, background_tasks: mode.backgroundTasks });
+});
+
+// Public bearer links live outside the authenticated API router. This router
+// never resolves a profile from cookies and exposes only its own allowlisted
+// read-only projection and token-scoped media resources.
+app.route("/share", createPublicShareRouter(uiDir));
+
+app.route("/api", api);
+
+// App icon, generated from the saved color so the favicon and the PWA icon
+// match the in-app logo. Served before serveStatic so it wins over the static
+// files in ./public. Note: an already-installed PWA caches its icon at install
+// time, so a color change only shows on (re)install or an OS icon refresh.
+const iconColor = () => getSetting("app_icon_color") || "#0a5fff";
+const svgHeaders = { "Content-Type": "image/svg+xml", "Cache-Control": "no-cache" };
+const pngHeaders = { "Content-Type": "image/png", "Cache-Control": "no-cache, no-store, must-revalidate" };
+const manifestHeaders = {
+  "Content-Type": "application/manifest+json",
+  "Cache-Control": "no-cache, no-store, must-revalidate",
+};
+
+app.get("/manifest.webmanifest", (c) =>
+  c.body(JSON.stringify(createAppManifest(getSetting("app_name"))), 200, manifestHeaders),
+);
+
+app.get("/favicon.svg", (c) =>
+  c.body(createAppIconSvg(iconColor()), 200, svgHeaders),
+);
+
+app.get("/icon-maskable.svg", (c) =>
+  c.body(createAppIconSvg(iconColor(), true), 200, svgHeaders),
+);
+
+// Apple requires a raster touch icon. These routes also let a fresh PWA
+// installation use the color selected in settings instead of a baked asset.
+app.get("/apple-touch-icon.png", (c) => c.body(createAppIconPng(iconColor(), 180), 200, pngHeaders));
+app.get("/icon-192.png", (c) => c.body(createAppIconPng(iconColor(), 192), 200, pngHeaders));
+app.get("/icon-512.png", (c) => c.body(createAppIconPng(iconColor(), 512), 200, pngHeaders));
+
+// This filename is stable across releases, unlike hashed JS/CSS assets. Never
+// let a browser or reverse proxy reuse the previous container's changelog.
+app.get("/changelog.json", async (c) => {
+  const file = Bun.file(`${uiDir}/changelog.json`);
+  if (!await file.exists()) return c.notFound();
+  return new Response(file, {
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
+    },
+  });
+});
+
+app.use("/*", serveStatic({ root: uiDir }));
+app.get("*", serveStatic({ path: `${uiDir}/index.html` }));
+
+await migrateLegacyProfileAvatars()
+  .catch((error) => log.warn("profile.avatar_migration_failed", { error: error instanceof Error ? error.message : String(error) }));
+const mode = deploymentMode(databaseConfig.engine);
+await startClusterHeartbeat();
+await startAppEventRelay({ cleanup: mode.backgroundTasks });
+if (mode.backgroundTasks) {
+  startScheduler();
+  await startDownloader();
+  scheduleTubeArchivistSync(true);
+  void flushTubeArchivistWatched();
+} else {
+  log.info("scheduler.disabled", { variable: "YTZERO_BACKGROUND_TASKS", database: databaseConfig.engine });
+}
+if (databaseConfig.engine === "postgres") {
+  let refreshingRuntimeCaches = false;
+  setInterval(() => {
+    if (refreshingRuntimeCaches) return;
+    refreshingRuntimeCaches = true;
+    Promise.all([reloadSettingCache(), reloadPluginEnabledCache()])
+      .then(([settingsChanged, changedPlugins]) => {
+        if (mode.backgroundTasks && (settingsChanged || changedPlugins.includes("tubearchivist"))) scheduleTubeArchivistSync();
+      })
+      .catch((error) => log.warn("cluster.cache_refresh_failed", { error: error instanceof Error ? error.message : String(error) }))
+      .finally(() => { refreshingRuntimeCaches = false; });
+  }, 2_000);
+}
+if (databaseConfig.engine === "sqlite") startSQLiteMaintenance(db);
+
+const port = Number(process.env.PORT ?? 3001);
+const idleTimeout = Number(process.env.IDLE_TIMEOUT_SECONDS ?? 120);
+const server = Bun.serve({ port, idleTimeout, fetch: app.fetch });
+log.info("app.listen", { url: String(server.url), port, uiDir, idleTimeout, version: VERSION, commit: COMMIT, backgroundTasks: mode.backgroundTasks, database: mode.database });
+collectDiagnosticSnapshot()
+  .then((snapshot) => log.info("app.state_snapshot", snapshot))
+  .catch((error) => log.warn("app.state_snapshot_failed", { error: error instanceof Error ? error.message : String(error) }));

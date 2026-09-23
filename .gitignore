@@ -18,6 +18,10 @@ logs/
 # Host provider runtime data (never store under providers/ytzero)
 data/ytzero/**
 !data/ytzero/.gitkeep
+data/postgres/**
+!data/postgres/.gitkeep
+data/backups/**
+!data/backups/.gitkeep
 deploy/ytzero/.env
 
 # Node (provider or future host tooling)

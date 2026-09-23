@@ -1,0 +1,7 @@
+# Optional overlay: run a locally patched YT Zero image (see Dockerfile.src-patch).
+# Build: docker build -f deploy/ytzero/Dockerfile.src-patch -t wonderfeed-ytzero:src-patch .
+# Use:   YTZERO_IMAGE=wonderfeed-ytzero:src-patch wonderfeed provider up
+# Or compose: docker compose -p wonderfeed-ytzero -f compose.yaml -f compose.src-patch.yaml up -d
+services:
+  ytzero:
+    image: ${YTZERO_IMAGE:-wonderfeed-ytzero:src-patch}

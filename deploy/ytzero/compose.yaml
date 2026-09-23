@@ -1,9 +1,30 @@
-# Host-owned YT Zero overlay. Data lives under data/ytzero/, not in the submodule.
+# Host-owned YT Zero + PostgreSQL overlay.
+# Durable state: data/postgres (DB) and data/ytzero (files). Never under providers/ytzero.
 # Image tag tracks the providers/ytzero release label; override with YTZERO_IMAGE.
 services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine}
+    container_name: wonderfeed-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ytzero}
+      POSTGRES_USER: ${POSTGRES_USER:-ytzero}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/ytzero/.env}
+    volumes:
+      - ../../data/postgres/pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
   ytzero:
     image: ${YTZERO_IMAGE:-ghcr.io/pelski/ytzero:2026.09.8}
     container_name: wonderfeed-ytzero
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "${YTZERO_HOST_PORT:-3001}:3001"
     volumes:
@@ -12,11 +33,12 @@ services:
       - .env
     environment:
       PORT: "3001"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ytzero}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ytzero}
+      DATABASE_STATE_PATH: /data/database-state.json
       IDLE_TIMEOUT_SECONDS: ${IDLE_TIMEOUT_SECONDS:-120}
       REFRESH_INTERVAL_MINUTES: ${REFRESH_INTERVAL_MINUTES:-5}
       FULL_SYNC_INTERVAL_MINUTES: ${FULL_SYNC_INTERVAL_MINUTES:-15}
       VIDEO_MAINTENANCE_MAX_AGE_DAYS: ${VIDEO_MAINTENANCE_MAX_AGE_DAYS:-90}
-      DB_PATH: /data/db/ytzero.db
       IMG_CACHE_DIR: /data/imgcache
       LOG_PATH: /data/logs/ytzero.log
       DOWNLOADS_DIR: /data/downloads

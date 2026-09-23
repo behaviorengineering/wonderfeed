@@ -55,6 +55,7 @@ func TestFormatStatus(t *testing.T) {
 		Root:         "/repo",
 		ComposeFile:  "/repo/deploy/ytzero/compose.yaml",
 		DataDir:      "/repo/data/ytzero",
+		PostgresDir:  "/repo/data/postgres",
 		ProviderDir:  "/repo/providers/ytzero",
 		ProviderHEAD: "abc",
 		ProviderDesc: "2026.09.8",
@@ -64,7 +65,7 @@ func TestFormatStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("FormatStatus: %v", err)
 	}
-	for _, part := range []string{"Provider: YT Zero", "2026.09.8", DefaultBaseURL} {
+	for _, part := range []string{"Provider: YT Zero (PostgreSQL)", "2026.09.8", DefaultBaseURL, "Postgres data:"} {
 		if !strings.Contains(out, part) {
 			t.Fatalf("missing %q in:\n%s", part, out)
 		}

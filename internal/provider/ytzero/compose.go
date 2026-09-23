@@ -2,10 +2,13 @@ package ytzero
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/behaviorengineering/wonderfeed/internal/apperr"
@@ -18,6 +21,7 @@ func wrap(err error, op, message string) *apperr.Error {
 }
 
 // EnsureEnvFile copies the example env when deploy/ytzero/.env is missing.
+// It replaces the POSTGRES_PASSWORD placeholder with a random value.
 func EnsureEnvFile(paths Paths) error {
 	const op = "ytzero.EnsureEnvFile"
 	if _, err := os.Stat(paths.EnvFile); err == nil {
@@ -29,17 +33,33 @@ func EnsureEnvFile(paths Paths) error {
 	if err != nil {
 		return apperr.Wrap(err, apperr.CodeNotFound, op, "read env example").With("path", paths.EnvExample)
 	}
-	if err := os.WriteFile(paths.EnvFile, data, 0o600); err != nil {
+	password, err := randomPassword()
+	if err != nil {
+		return apperr.Wrap(err, apperr.CodeFailed, op, "generate postgres password")
+	}
+	text := string(data)
+	text = strings.Replace(text, "POSTGRES_PASSWORD="+postgresPasswordPlaceholder, "POSTGRES_PASSWORD="+password, 1)
+	if err := os.WriteFile(paths.EnvFile, []byte(text), 0o600); err != nil {
 		return apperr.Wrap(err, apperr.CodeFailed, op, "write env file").With("path", paths.EnvFile)
 	}
 	return nil
 }
 
-// EnsureDataDir creates the host data directory for the provider volume.
-func EnsureDataDir(paths Paths) error {
-	const op = "ytzero.EnsureDataDir"
-	if err := os.MkdirAll(paths.DataDir, 0o755); err != nil {
-		return apperr.Wrap(err, apperr.CodeFailed, op, "create data directory").With("path", paths.DataDir)
+func randomPassword() (string, error) {
+	buf := make([]byte, 24)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
+}
+
+// EnsureDataDirs creates host data directories for YT Zero files and PostgreSQL.
+func EnsureDataDirs(paths Paths) error {
+	const op = "ytzero.EnsureDataDirs"
+	for _, dir := range []string{paths.DataDir, paths.PostgresDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return apperr.Wrap(err, apperr.CodeFailed, op, "create data directory").With("path", dir)
+		}
 	}
 	return nil
 }
@@ -65,11 +85,11 @@ func ProbeDocker(ctx context.Context, timeout time.Duration) error {
 	return nil
 }
 
-// Up starts the host YT Zero compose project.
-func Up(ctx context.Context, paths Paths) error {
-	const op = "ytzero.Up"
-	if err := EnsureDataDir(paths); err != nil {
-		return apperr.Wrap(err, apperr.CodeFailed, op, "ensure data dir")
+// Prepare ensures data dirs and env exist and Docker answers (no compose start).
+func Prepare(ctx context.Context, paths Paths) error {
+	const op = "ytzero.Prepare"
+	if err := EnsureDataDirs(paths); err != nil {
+		return apperr.Wrap(err, apperr.CodeFailed, op, "ensure data dirs")
 	}
 	if err := EnsureEnvFile(paths); err != nil {
 		return apperr.Wrap(err, apperr.CodeFailed, op, "ensure env file")
@@ -77,13 +97,22 @@ func Up(ctx context.Context, paths Paths) error {
 	if err := ProbeDocker(ctx, defaultDockerProbe); err != nil {
 		return apperr.Wrap(err, apperr.CodeUnavailable, op, "docker preflight")
 	}
+	return nil
+}
+
+// Up starts the host YT Zero compose project detached (PostgreSQL + app).
+func Up(ctx context.Context, paths Paths) error {
+	const op = "ytzero.Up"
+	if err := Prepare(ctx, paths); err != nil {
+		return apperr.Wrap(err, apperr.CodeFailed, op, "prepare")
+	}
 	if err := runCompose(ctx, paths, "up", "-d", "--remove-orphans"); err != nil {
 		return apperr.Wrap(err, apperr.CodeFailed, op, "compose up")
 	}
 	return nil
 }
 
-// Down stops the host YT Zero compose project without removing volumes.
+// Down stops the host compose project without removing volumes.
 func Down(ctx context.Context, paths Paths) error {
 	const op = "ytzero.Down"
 	if err := ProbeDocker(ctx, defaultDockerProbe); err != nil {
