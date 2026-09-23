@@ -14,8 +14,12 @@ const (
 	RelEnvFile = "deploy/ytzero/.env"
 	// RelEnvExample is the committed env template relative to the repo root.
 	RelEnvExample = "deploy/ytzero/.env.example"
-	// RelDataDir is the host data volume relative to the repo root.
+	// RelDataDir is the host YT Zero file volume relative to the repo root.
 	RelDataDir = "data/ytzero"
+	// RelPostgresDir is the host PostgreSQL parent directory relative to the repo root.
+	RelPostgresDir = "data/postgres"
+	// RelPostgresData is the PostgreSQL data subdirectory (must be empty for initdb).
+	RelPostgresData = "data/postgres/pgdata"
 	// RelProviderDir is the git submodule path relative to the repo root.
 	RelProviderDir = "providers/ytzero"
 	// ComposeProject names the docker compose project.
@@ -24,6 +28,8 @@ const (
 	DefaultBaseURL = "http://127.0.0.1:3001"
 	// HealthPath is the unauthenticated health endpoint.
 	HealthPath = "/api/health"
+	// postgresPasswordPlaceholder is replaced on first env create.
+	postgresPasswordPlaceholder = "change-me-now"
 )
 
 // Paths resolves host-owned paths for the YT Zero overlay.
@@ -33,6 +39,7 @@ type Paths struct {
 	EnvFile     string
 	EnvExample  string
 	DataDir     string
+	PostgresDir string
 	ProviderDir string
 }
 
@@ -56,6 +63,7 @@ func ResolvePaths(start string) (Paths, error) {
 		EnvFile:     filepath.Join(root, RelEnvFile),
 		EnvExample:  filepath.Join(root, RelEnvExample),
 		DataDir:     filepath.Join(root, RelDataDir),
+		PostgresDir: filepath.Join(root, RelPostgresData),
 		ProviderDir: filepath.Join(root, RelProviderDir),
 	}, nil
 }

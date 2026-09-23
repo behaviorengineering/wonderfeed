@@ -40,6 +40,9 @@ func TestRunHelp(t *testing.T) {
 	if !strings.Contains(stdout.String(), "provider up") {
 		t.Fatalf("stdout = %q", stdout.String())
 	}
+	if !strings.Contains(stdout.String(), "backup create") {
+		t.Fatalf("stdout missing backup: %q", stdout.String())
+	}
 }
 
 func TestRunUnknown(t *testing.T) {

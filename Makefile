@@ -4,7 +4,7 @@ GO ?= go
 BIN_DIR := bin
 BINARY := $(BIN_DIR)/wonderfeed
 
-.PHONY: help build test vet tidy format serve serve-down provider-status provider-health
+.PHONY: help build test vet tidy format serve serve-down provider-image provider-status provider-health provider-up provider-down backup-create backup-list
 
 help: ## List available make verbs
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | \
@@ -26,10 +26,20 @@ tidy: ## Run go mod tidy
 format: ## Format Go sources
 	$(GO) fmt ./...
 
-serve: build ## Start YT Zero via host compose overlay
-	$(BINARY) provider up
+# Patched app sources on top of the pinned release image (Postgres cold-start fixes).
+provider-image: ## Build wonderfeed-ytzero:src-patch from providers/ytzero
+	docker build -f deploy/ytzero/Dockerfile.src-patch -t wonderfeed-ytzero:src-patch .
 
-serve-down: build ## Stop YT Zero without removing volumes
+serve: provider-image ## process-compose TUI for PostgreSQL + YT Zero
+	YTZERO_IMAGE=wonderfeed-ytzero:src-patch ./scripts/pc-up.sh
+
+serve-down: ## Stop provider stack without removing volumes
+	./scripts/pc-down.sh
+
+provider-up: build provider-image ## Start PostgreSQL + YT Zero detached
+	YTZERO_IMAGE=wonderfeed-ytzero:src-patch $(BINARY) provider up
+
+provider-down: build ## Stop compose stack without removing volumes
 	$(BINARY) provider down
 
 provider-status: build ## Show provider pin and compose state
@@ -37,3 +47,9 @@ provider-status: build ## Show provider pin and compose state
 
 provider-health: build ## GET local YT Zero /api/health
 	$(BINARY) provider health
+
+backup-create: build ## Encrypted local backup (pg_dump + portable state)
+	$(BINARY) backup create --local-only
+
+backup-list: build ## List local (and optional S3) backups
+	$(BINARY) backup list

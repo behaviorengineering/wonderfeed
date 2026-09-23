@@ -13,7 +13,7 @@
 ## Milestone 1: Operate the provider as-is
 
 - [x] Host compose overlay and Go CLI to run YT Zero without writing into the submodule
-- [ ] Run YT Zero locally via `make serve` (Docker required)
+- [x] Host PostgreSQL + process-compose serve path (`make serve` / `make provider-up`)
 - [ ] Import a small trusted channel set for a trial household
 - [ ] Exercise child profile, subscribed-content-only mode, Shorts/live gating, and watch-time limits
 - [ ] Record gaps relative to Wonderfeed principles (approval requests, diversity rules, child UI lock strength)

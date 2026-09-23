@@ -1,0 +1,6 @@
+# Rebuild YT Zero app sources on top of the pinned release image.
+# Use while waiting for an upstream tag that includes the Postgres cold-start fix
+# (image_cache / migrateSQLiteToPostgres import race).
+ARG YTZERO_BASE=ghcr.io/pelski/ytzero:2026.09.8
+FROM ${YTZERO_BASE}
+COPY providers/ytzero/app/src /app/src

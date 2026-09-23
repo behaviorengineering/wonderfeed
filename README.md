@@ -22,7 +22,8 @@ Canonical docs:
 | [docs/product-brief.md](docs/product-brief.md) | Problem, users, principles, non-goals, success criteria |
 | [docs/architecture.md](docs/architecture.md) | Host vs provider boundary, feed/playback model, seams |
 | [docs/roadmap.md](docs/roadmap.md) | Milestones, risks, decision gates |
-| [docs/operator-ytzero.md](docs/operator-ytzero.md) | Run and customize YT Zero from this repo |
+| [docs/operator-ytzero.md](docs/operator-ytzero.md) | Run PostgreSQL + YT Zero from this repo |
+| [docs/cloudflare.md](docs/cloudflare.md) | Tunnel/hostname design for remote home access |
 | [docs/decisions/0001-ytzero-provider.md](docs/decisions/0001-ytzero-provider.md) | Why YT Zero is the first provider pin |
 
 ## Repository layout
@@ -32,7 +33,11 @@ wonderfeed/
   cmd/wonderfeed/    # host operator CLI
   internal/          # host libraries (provider ops, errors)
   deploy/ytzero/     # host compose overlay and env template
-  data/ytzero/       # local provider data (gitignored)
+  data/ytzero/       # YT Zero files (gitignored)
+  data/postgres/     # PostgreSQL data (gitignored)
+  process-compose.yaml
+  scripts/pc-up.sh
+  scripts/pc-down.sh
   providers/
     ytzero/          # git submodule: Pelski/ytzero (do not spill host policy here)
   docs/              # product and architecture documentation
@@ -64,11 +69,12 @@ bash .cursor/packs/shared/scripts/link-into-project.sh --project .
 
 ```bash
 make build
-make serve
-make provider-health
+make provider-up          # detached PostgreSQL + YT Zero
+make provider-health      # expect "database": "postgres"
+# or interactive: make serve   (needs process-compose on PATH)
 ```
 
-Open http://127.0.0.1:3001. Stop with `make serve-down` (data kept). Full operator notes: [docs/operator-ytzero.md](docs/operator-ytzero.md).
+Open http://127.0.0.1:3001. Stop with `make serve-down` or `make provider-down` (data kept). Encrypted state backups: `make backup-create` / `wonderfeed backup list` (see operator docs). Operator notes: [docs/operator-ytzero.md](docs/operator-ytzero.md). Remote HTTPS design: [docs/cloudflare.md](docs/cloudflare.md).
 
 ## Provider boundary (critical)
 

@@ -18,8 +18,9 @@ Parent policy and product docs
 | Concern | Owner today | Notes |
 | --- | --- | --- |
 | Product principles, roadmap, parent UX intent | Wonderfeed host | Docs and host skills under this repo |
-| Local provider run (compose, env, data dir, health) | Wonderfeed host | `deploy/ytzero/`, `data/ytzero/`, `cmd/wonderfeed` |
-| Subscription inbox, tags, rules, profiles, local DB | YT Zero provider | Source at `providers/ytzero`; runtime data mounted from host |
+| Local provider run (compose, process-compose, env, health) | Wonderfeed host | `deploy/ytzero/`, `data/postgres/`, `data/ytzero/`, `cmd/wonderfeed` |
+| Subscription inbox, tags, rules, profiles | YT Zero provider | Source at `providers/ytzero`; DB in host Postgres; files under `data/ytzero` |
+| Remote HTTPS to homes (school/product) | Wonderfeed + Cloudflare | Design in [cloudflare.md](cloudflare.md); not local serve |
 | Device lockdown / kiosk / DNS blocks | Outside app (OS, browser profile, network) | Required for real child enforcement |
 | YouTube embed chrome and related videos | YouTube platform | Not fully removable via embed params |
 | Premium / ad-free entitlement | Signed-in YouTube session in the playback browser | Separate from Wonderfeed curation |
