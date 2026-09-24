@@ -1,0 +1,54 @@
+{
+  "description": "Canonical YouTube API legal/docs URLs and last-known content hashes. Full page snapshots live in gitignored snapshots/*.md. Refresh with: make youtube-api-terms-refresh",
+  "updated_at": "2026-09-23T13:57:37Z",
+  "documents": [
+    {
+      "id": "api-services-terms-of-service",
+      "title": "YouTube API Services Terms of Service",
+      "url": "https://developers.google.com/youtube/terms/api-services-terms-of-service",
+      "fetched_at": "2026-09-23T13:57:37Z",
+      "sha256": "c5bd720f0269ede0b16c056e393f3e013b867a4c5735837f74dc6b64b00a2a77",
+      "bytes": 101692
+    },
+    {
+      "id": "developer-policies",
+      "title": "YouTube API Services Developer Policies",
+      "url": "https://developers.google.com/youtube/terms/developer-policies",
+      "fetched_at": "2026-09-23T13:57:37Z",
+      "sha256": "c24ec30fbfed796b09377dc987289601e1e7ddaa5b7dcb10c6d2545f754aaace",
+      "bytes": 151819
+    },
+    {
+      "id": "developer-policies-guide",
+      "title": "Developer Policies Guide",
+      "url": "https://developers.google.com/youtube/terms/developer-policies-guide",
+      "fetched_at": "2026-09-23T13:57:37Z",
+      "sha256": "9cb8530581682ec18f7ecc835148e7fdebb4ef9151448fcba690f6fac49e44ce",
+      "bytes": 77808
+    },
+    {
+      "id": "required-minimum-functionality",
+      "title": "Required Minimum Functionality",
+      "url": "https://developers.google.com/youtube/terms/required-minimum-functionality",
+      "fetched_at": "2026-09-23T13:57:37Z",
+      "sha256": "85eb8cec0f9918b5cea740cae7d0cfbfd4d9815cd5f0ab8daeb21293238f466f",
+      "bytes": 92269
+    },
+    {
+      "id": "revision-history",
+      "title": "Terms revision history",
+      "url": "https://developers.google.com/youtube/terms/revision-history",
+      "fetched_at": "2026-09-23T13:57:37Z",
+      "sha256": "f5da31c1075f662731aa8dde724e902728acbcb9fb96a1c4fb072ed1c77dca20",
+      "bytes": 81400
+    },
+    {
+      "id": "determine-quota-cost",
+      "title": "Quota costs",
+      "url": "https://developers.google.com/youtube/v3/determine_quota_cost",
+      "fetched_at": "2026-09-23T13:57:37Z",
+      "sha256": "ae3c4ff7a9f18590019ebb1601cca49a1ac25b006e62de35092ac942009a3408",
+      "bytes": 93998
+    }
+  ]
+}

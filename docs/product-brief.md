@@ -57,4 +57,5 @@ A first useful release is successful when:
 - Architecture: [architecture.md](architecture.md)
 - Roadmap: [roadmap.md](roadmap.md)
 - Provider decision: [decisions/0001-ytzero-provider.md](decisions/0001-ytzero-provider.md)
+- Hosted curated library (vision): [curated-library.md](curated-library.md)
 - Upstream YT Zero: https://github.com/Pelski/ytzero

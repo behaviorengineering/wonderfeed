@@ -13,6 +13,34 @@ Parent policy and product docs
     -> future child-facing presentation
 ```
 
+## Target product flow (vision)
+
+Not implemented yet. Parent concierge and child librarian agents, plus a central curation service, sit on top of the home host. Detail: [curated-library.md](curated-library.md) and the root [README](../README.md).
+
+```mermaid
+flowchart TD
+  subgraph family [Household Surface]
+    parent[Parent] -->|"Voice / Chat: Goals and boundaries"| concierge[Parent Concierge Agent]
+    child[Child] -->|"Voice inquiry: Questions and requests"| librarian[Child Librarian Agent]
+    librarian -->|"Matches existing library"| childFeed[Calm Child Feed]
+  end
+
+  concierge -->|"Compiled rules and allowlist"| homeHost[Home Mini PC]
+  librarian -->|"New topic or channel request"| reviewQueue[Parent Review Queue]
+
+  subgraph cloud [Wonderfeed Central Service]
+    reviewQueue -->|"Evaluate candidate"| evalEngine[Curation and Evaluation Engine]
+    evalEngine -->|"YouTube Data API"| ytApi[YouTube Data API]
+    evalEngine -->|"Tone, pacing, topic profile"| reviewQueue
+  end
+
+  reviewQueue -->|"One-tap review alert"| parent
+  parent -->|"Approve"| homeHost
+
+  homeHost -->|"Sync allowed items"| childFeed
+  childFeed -->|"Standard embed playback"| ytCdn[YouTube CDN]
+```
+
 ## Ownership boundary
 
 | Concern | Owner today | Notes |
@@ -75,3 +103,5 @@ No registry, DI container, or host control-plane database exists yet. Host ops f
 ## Deferred decisions
 
 Documented in [roadmap.md](roadmap.md): wrap vs extend vs replace YT Zero UI, runtime language, auth model, telemetry policy, and ranking sophistication beyond rules.
+
+A longer-horizon hosted **curated library** (YouTube Data API discovery, sampled evaluation, shared “stuff that matters” catalog) is sketched in [curated-library.md](curated-library.md). It is not part of the home Postgres / provider ops slice.
