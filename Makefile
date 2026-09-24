@@ -4,7 +4,7 @@ GO ?= go
 BIN_DIR := bin
 BINARY := $(BIN_DIR)/wonderfeed
 
-.PHONY: help build test vet tidy format serve serve-down provider-image provider-status provider-health provider-up provider-down backup-create backup-list
+.PHONY: help build test vet tidy format serve serve-down provider-image provider-status provider-health provider-up provider-down backup-create backup-list youtube-api-terms-refresh
 
 help: ## List available make verbs
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | \
@@ -53,3 +53,6 @@ backup-create: build ## Encrypted local backup (pg_dump + portable state)
 
 backup-list: build ## List local (and optional S3) backups
 	$(BINARY) backup list
+
+youtube-api-terms-refresh: ## Download YouTube API ToS locally; update docs/legal/youtube-api/manifest.json hashes
+	./scripts/fetch-youtube-api-terms.sh

@@ -1,100 +1,46 @@
 # Wonderfeed
 
-Wonderfeed is a **parent-owned control plane for kids' video watching**. It aims to replace YouTube's recommendation loop with a rules-based feed of content parents deliberately allow, while still using YouTube (or similar hosts) for actual playback.
+YouTube is built to keep people watching. For children, that means Shorts, open search, and rabbit holes. Wonderfeed turns YouTube into a library you control. It is what a smart home YouTube integration should be: voice-first, parent-aligned, and focused on your chosen channels rather than engagement.
 
-This repository is the **host product**. Provider integrations live under `providers/`. The first provider foundation is [YT Zero](https://github.com/Pelski/ytzero), mounted at [`providers/ytzero`](providers/ytzero).
+### Why Wonderfeed?
 
-## Product thesis
+- **Better than YouTube Kids:** You pick the channels. There is no mystery algorithm trying to keep them watching.
+- **Better than timers:** You control the content, not just the clock.
+- **Beyond YT Zero:** [YT Zero](https://github.com/Pelski/ytzero) is the technical engine that fetches trusted-channel feeds. Wonderfeed is the family product that owns the rules, the conversation, and fail-closed playback.
 
-Parents should be able to:
+### How it works
 
-- Choose trusted channels and approved videos.
-- Push a calm, chronological, policy-shaped feed to children.
-- Keep discovery, ranking, approval, and session rules under family control.
-- Avoid treating YouTube Home, Shorts, or search as the child's default surface.
+1. **You curate the library.** Only channels you approve can appear.
+2. **Distractions are gated.** Shorts, live, and open search are policy-controlled, not the default child surface.
+3. **You own the session.** You decide what plays and for how long.
 
-Wonderfeed owns product policy, parent workflows, and future adapters. YT Zero owns subscription-inbox and rules-based feed machinery today. Wonderfeed must not invent host branding or private layout inside the provider submodule.
+### Current status
 
-Canonical docs:
+This is early. Milestone 1 is a local foundation, not a polished parent app yet.
 
-| Doc | Purpose |
-| --- | --- |
-| [docs/product-brief.md](docs/product-brief.md) | Problem, users, principles, non-goals, success criteria |
-| [docs/architecture.md](docs/architecture.md) | Host vs provider boundary, feed/playback model, seams |
-| [docs/roadmap.md](docs/roadmap.md) | Milestones, risks, decision gates |
-| [docs/operator-ytzero.md](docs/operator-ytzero.md) | Run PostgreSQL + YT Zero from this repo |
-| [docs/cloudflare.md](docs/cloudflare.md) | Tunnel/hostname design for remote home access |
-| [docs/decisions/0001-ytzero-provider.md](docs/decisions/0001-ytzero-provider.md) | Why YT Zero is the first provider pin |
+**Ready now**
 
-## Repository layout
+- Host docs, ops, and a pinned YT Zero provider you can run locally (`make serve` / `make provider-up`)
+- Allowlist-style channel feeds, with Shorts/live/search gated through provider policy
+- No Wonderfeed parent app or child-facing product UI yet
 
-```text
-wonderfeed/
-  cmd/wonderfeed/    # host operator CLI
-  internal/          # host libraries (provider ops, errors)
-  deploy/ytzero/     # host compose overlay and env template
-  data/ytzero/       # YT Zero files (gitignored)
-  data/postgres/     # PostgreSQL data (gitignored)
-  process-compose.yaml
-  scripts/pc-up.sh
-  scripts/pc-down.sh
-  providers/
-    ytzero/          # git submodule: Pelski/ytzero (do not spill host policy here)
-  docs/              # product and architecture documentation
-  .cursor/
-    packs/shared/    # git submodule: shared Cursor packs
-    skills/          # pack symlinks + host-owned Wonderfeed skills
-```
+**Building next**
 
-## Clone with submodules
+- Parent voice/chat policy
+- Child push-to-talk librarian
+- Parent review for new requests
+- Hosted channel evaluation
 
-```bash
-git clone --recurse-submodules https://github.com/behaviorengineering/wonderfeed.git
-cd wonderfeed
-```
+Details: [curated-library.md](docs/curated-library.md), [roadmap.md](docs/roadmap.md).
 
-If you already cloned without submodules:
+---
 
-```bash
-git submodule update --init --recursive
-```
+## Documentation
 
-After updating the packs pin, refresh Cursor links:
-
-```bash
-bash .cursor/packs/shared/scripts/link-into-project.sh --project .
-```
-
-## Run the provider (Milestone 1)
-
-```bash
-make build
-make provider-up          # detached PostgreSQL + YT Zero
-make provider-health      # expect "database": "postgres"
-# or interactive: make serve   (needs process-compose on PATH)
-```
-
-Open http://127.0.0.1:3001. Stop with `make serve-down` or `make provider-down` (data kept). Encrypted state backups: `make backup-create` / `wonderfeed backup list` (see operator docs). Operator notes: [docs/operator-ytzero.md](docs/operator-ytzero.md). Remote HTTPS design: [docs/cloudflare.md](docs/cloudflare.md).
-
-## Provider boundary (critical)
-
-- Treat `providers/ytzero` as an independent repository.
-- Put Wonderfeed-specific skills, brand, policy, and private paths in this host only.
-- Prefer wrapping, adapting, or composing the provider over editing upstream for product needs.
-- See repository-boundary rules in `.cursor/rules/repository-boundaries.mdc` and the host skills `.cursor/skills/wonderfeed-provider-integration/` and `.cursor/skills/wonderfeed-ytzero-ops/`.
-
-## Current status
-
-Milestone 1 ops scaffold:
-
-- Public host repository and product docs.
-- YT Zero pinned as a provider submodule.
-- Host Cursor skills for product context, provider integration, content policy, and YT Zero ops.
-- Host Go CLI (`wonderfeed`) and compose overlay to run the provider without writing into the submodule.
-
-Runtime control plane, authentication product model, and the exact child-facing UI are **not** decided yet. See the [roadmap](docs/roadmap.md).
-
-## License note
-
-Host documentation, skills, and Go tooling in this repository are authored for Wonderfeed. The `providers/ytzero` tree remains under its upstream license (AGPL-3.0). Treat provider license obligations carefully before shipping derived binaries or services. Prefer the Docker/HTTP process boundary documented in [docs/operator-ytzero.md](docs/operator-ytzero.md).
-
+- [Product brief](docs/product-brief.md)
+- [Architecture](docs/architecture.md)
+- [Roadmap](docs/roadmap.md)
+- [Curated library (vision)](docs/curated-library.md)
+- [Operator runbook](docs/operator-ytzero.md)
+- [Remote access](docs/cloudflare.md)
+- [Copilot guide](AGENTS.md)

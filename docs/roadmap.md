@@ -69,6 +69,10 @@ Minimum host-owned capabilities (may be adapters over provider features):
 | False safety | Docs imply YT Zero alone is full parental control | Keep architecture language honest about layers |
 | Scope creep | Building adult YouTube power-user features | Hold to product brief non-goals |
 
+## Later direction (not scheduled)
+
+Hosted curated library: central discovery and evaluation service that grows a shared catalog of channels and videos worth following, then drives parent/kid search suggestions from that store instead of YouTube Home. Draft: [curated-library.md](curated-library.md).
+
 ## Decision log
 
 | ID | Title | Status |
