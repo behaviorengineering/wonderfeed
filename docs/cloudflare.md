@@ -71,12 +71,24 @@ Each home box should run:
 
 Recommended local network model:
 
-- App listens on `127.0.0.1:<app-port>` or `localhost:<app-port>`.
-- PostgreSQL is bound locally, not exposed on LAN.
-- `cloudflared` forwards the public hostname only to the local app port.
+- Wonderfeed control plane listens on `127.0.0.1:8080` by default (`wonderfeed control serve`).
+- YT Zero app listens on `127.0.0.1:3001` (provider UI/API; not the public product contract).
+- PostgreSQL is published to host loopback only (`127.0.0.1:5432`), not to the LAN.
+- `cloudflared` forwards the public household hostname **only** to the Wonderfeed control-plane port (`http://localhost:8080`), never to port `5432` or port `3001`.
 - No inbound router port forwarding at all.
 
 That aligns with Tunnel’s purpose: Cloudflare Tunnel connects the origin outward to Cloudflare without a public IP on the home side. [developers.cloudflare](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/)
+
+### Tunnel ingress (home box)
+
+Publish only the authenticated Wonderfeed control API:
+
+```text
+hostname: <household-id>.homes.wonderfeed.app
+service:  http://localhost:8080
+```
+
+Do not add ingress rules for PostgreSQL or raw YT Zero. Parent calls require `Authorization: Bearer <WONDERFEED_PARENT_AUTH_KEY>` when the control plane is reachable beyond loopback.
 
 ## Control plane
 

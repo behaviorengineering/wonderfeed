@@ -43,6 +43,9 @@ func TestRunHelp(t *testing.T) {
 	if !strings.Contains(stdout.String(), "backup create") {
 		t.Fatalf("stdout missing backup: %q", stdout.String())
 	}
+	if !strings.Contains(stdout.String(), "control serve") {
+		t.Fatalf("stdout missing control: %q", stdout.String())
+	}
 }
 
 func TestRunUnknown(t *testing.T) {
@@ -51,5 +54,29 @@ func TestRunUnknown(t *testing.T) {
 	code := run([]string{"wonderfeed", "nope"}, &bytes.Buffer{}, &stderr)
 	if code != 2 {
 		t.Fatalf("code = %d", code)
+	}
+}
+
+func TestRunControlHelp(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	code := run([]string{"wonderfeed", "control", "help"}, &stdout, &bytes.Buffer{})
+	if code != 0 {
+		t.Fatalf("code = %d", code)
+	}
+	if !strings.Contains(stdout.String(), "serve") || !strings.Contains(stdout.String(), "migrate up") {
+		t.Fatalf("stdout = %q", stdout.String())
+	}
+}
+
+func TestRunControlServeHelp(t *testing.T) {
+	t.Parallel()
+	var stdout bytes.Buffer
+	code := run([]string{"wonderfeed", "control", "serve", "--help"}, &stdout, &bytes.Buffer{})
+	if code != 0 {
+		t.Fatalf("code = %d", code)
+	}
+	if !strings.Contains(stdout.String(), "WONDERFEED_CONTROL_BIND") {
+		t.Fatalf("stdout = %q", stdout.String())
 	}
 }

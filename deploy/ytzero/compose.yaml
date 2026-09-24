@@ -10,6 +10,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-ytzero}
       POSTGRES_USER: ${POSTGRES_USER:-ytzero}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/ytzero/.env}
+    ports:
+      # Loopback-only publish so host Go binaries can reach Postgres without LAN exposure.
+      - "${POSTGRES_HOST_PORT:-127.0.0.1:5432}:5432"
     volumes:
       - ../../data/postgres/pgdata:/var/lib/postgresql/data
     healthcheck:
