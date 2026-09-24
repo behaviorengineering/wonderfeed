@@ -12,8 +12,14 @@ type Code string
 const (
 	// CodeInvalid is a bad operator input or configuration.
 	CodeInvalid Code = "invalid"
+	// CodeUnauthorized is a missing or invalid parent credential.
+	CodeUnauthorized Code = "unauthorized"
+	// CodeForbidden is an authenticated caller without permission.
+	CodeForbidden Code = "forbidden"
 	// CodeNotFound is a missing path or resource.
 	CodeNotFound Code = "not_found"
+	// CodeConflict is an optimistic-lock or uniqueness conflict.
+	CodeConflict Code = "conflict"
 	// CodeUnavailable is a dependency that is down (Docker, provider HTTP).
 	CodeUnavailable Code = "unavailable"
 	// CodeFailed is a generic failed operation.

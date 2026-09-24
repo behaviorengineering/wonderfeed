@@ -2,15 +2,15 @@
 
 ## Current shape
 
-Wonderfeed is a **host repository** with provider submodules. A small host Go CLI and Docker Compose overlay can run the pinned YT Zero provider locally. There is not yet a Wonderfeed control-plane database or child-facing product UI. The architecture docs define ownership and seams so later implementation does not blur them.
+Wonderfeed is a **host repository** with provider submodules. A host Go CLI runs the pinned YT Zero provider locally and also serves a parent **control plane** (`wonderfeed control serve`) that owns child policy in host PostgreSQL and syncs a supported subset through a YT Zero adapter.
 
 ```text
-Parent policy and product docs
-  -> Wonderfeed host CLI / deploy overlay (ops)
-  -> Wonderfeed host-owned adapter and future control plane
-    -> YT Zero provider boundary at providers/ytzero
+Parent device (authenticated HTTP)
+  -> Wonderfeed control plane (internal/controlplane + internal/httpapi)
+    -> host-owned wonderfeed.* tables in PostgreSQL
+    -> provider.ChildProfileProvider adapter
+      -> YT Zero HTTP API (profiles / child_config)
     -> provider-owned feed state and playback links
-    -> future child-facing presentation
 ```
 
 ## Target product flow (vision)
@@ -47,6 +47,7 @@ flowchart TD
 | --- | --- | --- |
 | Product principles, roadmap, parent UX intent | Wonderfeed host | Docs and host skills under this repo |
 | Local provider run (compose, process-compose, env, health) | Wonderfeed host | `deploy/ytzero/`, `data/postgres/`, `data/ytzero/`, `cmd/wonderfeed` |
+| Parent child-policy control plane | Wonderfeed host | `wonderfeed control serve`; schema `wonderfeed.*`; adapter under `internal/provider/ytzero` |
 | Subscription inbox, tags, rules, profiles | YT Zero provider | Source at `providers/ytzero`; DB in host Postgres; files under `data/ytzero` |
 | Remote HTTPS to homes (school/product) | Wonderfeed + Cloudflare | Design in [cloudflare.md](cloudflare.md); not local serve |
 | Device lockdown / kiosk / DNS blocks | Outside app (OS, browser profile, network) | Required for real child enforcement |
@@ -63,7 +64,7 @@ Trusted channels, tags, automatic rules, archive/reject flows, and chronological
 
 ### 2. Parent approval and policy
 
-Who may watch what, daily limits, Shorts/live gating, request-to-approve flows, and diversity rules (for example max one video per channel in N slots). Some of this exists in YT Zero child profiles; Wonderfeed may wrap or extend it later without forking product spill into upstream.
+Who may watch what, daily limits, Shorts/live gating, request-to-approve flows, and diversity rules (for example max one video per channel in N slots). Wonderfeed now owns desired child policy in host tables and syncs supported fields (`daily_minutes`, `local_only`, `hide_shorts`, `hide_live`, `downloads_only`) to YT Zero. Approval queues and main-feed diversity remain host work ahead.
 
 ### 3. Child presentation
 
@@ -88,10 +89,10 @@ These are the places a future host adapter will touch first:
 1. **Channel set import/export** — OPML, Takeout CSV, NewPipe JSON already understood by YT Zero.
 2. **Feed listing** — chronological uploads from allowlisted channels, with format filters.
 3. **Triage states** — watch / schedule / archive / reject as durable host or provider state.
-4. **Profile and limit APIs** — map Wonderfeed parent policy onto provider profiles when wrapping.
+4. **Profile and limit APIs** — Wonderfeed `ChildProfileProvider` maps host policy onto provider profiles (YT Zero `/api/profiles` today).
 5. **Playback handoff** — approved `videoId` into an embed or provider player, never unrestricted search.
 
-No registry, DI container, or host control-plane database exists yet. Host ops for the provider are documented in [operator-ytzero.md](operator-ytzero.md). When control-plane registration arrives, document order in a plan that follows `.cursor/skills/plan-scaffold/`.
+Host control-plane persistence lives in PostgreSQL schema `wonderfeed` (migrations embedded under `internal/controlplane/store/migrations/`). Provider ops remain documented in [operator-ytzero.md](operator-ytzero.md). Start the API with `wonderfeed control serve` (loopback by default; non-loopback requires `WONDERFEED_PARENT_AUTH_KEY`).
 
 ## Explicit limitations
 

@@ -37,6 +37,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runProvider(args[2:], stdout, stderr)
 	case "backup":
 		return runBackup(args[2:], stdout, stderr)
+	case "control":
+		return runControl(args[2:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown command: %s\n\n", args[1])
 		printUsage(stderr)
@@ -59,6 +61,8 @@ Commands:
   backup create        Encrypted Postgres + portable state backup
   backup list          List local (and optional S3) backups
   backup restore <id>  Restore a backup (requires --confirm)
+  control serve        Start parent control-plane HTTP API
+  control migrate up   Apply host control-plane database migrations
 
 Interactive stack: make serve (process-compose). Detached: wonderfeed provider up.
 
