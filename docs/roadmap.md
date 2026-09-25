@@ -75,15 +75,16 @@ Operator runbook: [operator-ytzero.md](operator-ytzero.md).
 
 ## Milestone 2: Choose the integration shape
 
-Pick one primary path (decision record required):
+**Accepted path:** [ADR 0002](decisions/0002-wrap-provider-now.md), wrap the
+provider now and replace the child surface later.
 
 | Option | Meaning |
 | --- | --- |
-| A. Wrap | Wonderfeed control plane configures and fronts YT Zero; child may still use provider UI under lockdown |
+| A. Wrap | **Selected.** Wonderfeed control plane configures and fronts YT Zero; child may still use provider UI under lockdown |
 | B. Compose | Wonderfeed owns child/parent UI; reads/writes provider feed state through a thin adapter |
 | C. Replace surface | Keep YT Zero for ingestion only; Wonderfeed replaces presentation entirely |
 
-**Exit gate:** ADR chooses A/B/C with rejected alternatives and license implications (YT Zero is AGPL-3.0).
+**Exit gate:** met by ADR 0002, including rejected alternatives and AGPL-3.0 licensing implications.
 
 ## Milestone 3: Parent control plane MVP
 
@@ -92,7 +93,7 @@ Minimum host-owned capabilities (may be adapters over provider features):
 - [x] Host-owned child profile + policy API (`wonderfeed control serve`) with provider adapter seam
 - [x] Durable desired policy in host PostgreSQL (`wonderfeed.*`) with sync status
 - [x] Fail-closed bind: non-loopback requires `WONDERFEED_PARENT_AUTH_KEY`
-- [ ] Channel allowlist management with exportable source of truth
+- [x] Channel allowlist management with a versioned, exportable JSON source of truth
 - [ ] Parent activity view (what played, what was rejected, pending requests if any)
 - [ ] Child cannot widen allowlists from the child surface (hard guarantee beyond YT Zero PIN)
 
@@ -125,5 +126,6 @@ Hosted curated library: central discovery and evaluation service that grows a sh
 | ID | Title | Status |
 | --- | --- | --- |
 | 0001 | YT Zero as first provider | Accepted |
+| 0002 | Wrap provider now, replace child surface later | Accepted |
 
 Future ADRs belong in `docs/decisions/` with sequential numbers.

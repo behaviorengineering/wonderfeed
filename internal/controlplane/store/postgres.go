@@ -146,6 +146,97 @@ func (s *PostgresStore) Get(ctx context.Context, id string) (controlplane.ChildP
 	return p, nil
 }
 
+// ListAllowlist returns the host-owned approved channels for a child.
+func (s *PostgresStore) ListAllowlist(ctx context.Context, id string) ([]controlplane.AllowlistChannel, error) {
+	const op = "store.PostgresStore.ListAllowlist"
+	if err := requireCtx(ctx, op); err != nil {
+		return nil, err
+	}
+	rows, err := s.pool.Query(ctx, `
+SELECT channel_id, title, url, added_at
+FROM wonderfeed.wf_child_allowlist_channels
+WHERE child_profile_id = $1
+ORDER BY added_at ASC, channel_id ASC`, id)
+	if err != nil {
+		return nil, apperr.Wrap(err, apperr.CodeFailed, op, "query").With("id", id)
+	}
+	defer rows.Close()
+	out := []controlplane.AllowlistChannel{}
+	for rows.Next() {
+		var channel controlplane.AllowlistChannel
+		if err := rows.Scan(&channel.ChannelID, &channel.Title, &channel.URL, &channel.AddedAt); err != nil {
+			return nil, apperr.Wrap(err, apperr.CodeFailed, op, "scan").With("id", id)
+		}
+		out = append(out, channel)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, apperr.Wrap(err, apperr.CodeFailed, op, "rows").With("id", id)
+	}
+	return out, nil
+}
+
+// ReplaceAllowlist replaces a child's host-owned channels with optimistic locking.
+func (s *PostgresStore) ReplaceAllowlist(ctx context.Context, id string, expectedVersion int64, channels []controlplane.AllowlistChannel) (controlplane.ChildProfile, error) {
+	const op = "store.PostgresStore.ReplaceAllowlist"
+	if err := requireCtx(ctx, op); err != nil {
+		return controlplane.ChildProfile{}, err
+	}
+	normalized, err := controlplane.NormalizeAllowlist(channels)
+	if err != nil {
+		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeInvalid, op, "validate allowlist")
+	}
+	now := s.clock().UTC()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeUnavailable, op, "begin")
+	}
+	defer tx.Rollback(ctx)
+
+	tag, err := tx.Exec(ctx, `
+UPDATE wonderfeed.wf_child_profiles
+SET allowlist_version = allowlist_version + 1, updated_at = $1
+WHERE id = $2 AND allowlist_version = $3`,
+		now, id, expectedVersion,
+	)
+	if err != nil {
+		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "update version").With("id", id)
+	}
+	if tag.RowsAffected() == 0 {
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM wonderfeed.wf_child_profiles WHERE id = $1)`, id).Scan(&exists); err != nil {
+			return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "check exists").With("id", id)
+		}
+		if !exists {
+			return controlplane.ChildProfile{}, apperr.New(apperr.CodeNotFound, op, "child profile not found").With("id", id)
+		}
+		return controlplane.ChildProfile{}, apperr.New(apperr.CodeConflict, op, "allowlist version conflict").With("id", id)
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM wonderfeed.wf_child_allowlist_channels WHERE child_profile_id = $1`, id); err != nil {
+		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "clear allowlist").With("id", id)
+	}
+	for _, channel := range normalized {
+		if _, err := tx.Exec(ctx, `
+INSERT INTO wonderfeed.wf_child_allowlist_channels (child_profile_id, channel_id, title, url, added_at)
+VALUES ($1, $2, $3, $4, $5)`,
+			id, channel.ChannelID, channel.Title, channel.URL, now,
+		); err != nil {
+			return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "insert allowlist channel").
+				With("id", id).With("channel_id", channel.ChannelID)
+		}
+	}
+	if _, err := tx.Exec(ctx, `
+INSERT INTO wonderfeed.wf_policy_sync_events (child_profile_id, status, sync_error, created_at)
+VALUES ($1, $2, '', $3)`,
+		id, string(controlplane.SyncPending), now,
+	); err != nil {
+		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "insert sync event").With("id", id)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "commit").With("id", id)
+	}
+	return s.Get(ctx, id)
+}
+
 // UpdatePolicy applies an optimistic-lock policy update and marks sync_pending.
 func (s *PostgresStore) UpdatePolicy(ctx context.Context, id string, expectedVersion int64, policy controlplane.ChildPolicy) (controlplane.ChildProfile, error) {
 	const op = "store.PostgresStore.UpdatePolicy"
@@ -280,6 +371,7 @@ SELECT
   p.avatar_color,
   p.provider_profile_id,
   p.version,
+  p.allowlist_version,
   p.created_at,
   p.updated_at,
   pol.daily_minutes,
@@ -316,6 +408,7 @@ func scanProfile(row scannable) (controlplane.ChildProfile, error) {
 		&p.AvatarColor,
 		&p.ProviderProfileID,
 		&p.Version,
+		&p.AllowlistVersion,
 		&p.CreatedAt,
 		&p.UpdatedAt,
 		&p.Policy.DailyMinutes,

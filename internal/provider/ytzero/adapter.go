@@ -122,6 +122,37 @@ func (a *Adapter) CreateChildProfile(ctx context.Context, name, avatarColor stri
 	}, nil
 }
 
+// ApplyAllowlist reconciles a child's followed channels with the host source
+// of truth through the provider admin reconcile API (household admin session).
+func (a *Adapter) ApplyAllowlist(ctx context.Context, providerProfileID string, channels []provider.Channel) error {
+	const op = "ytzero.Adapter.ApplyAllowlist"
+	if a == nil || a.client == nil {
+		return apperr.New(apperr.CodeInvalid, op, "adapter is nil")
+	}
+	profileID, err := strconv.Atoi(strings.TrimSpace(providerProfileID))
+	if err != nil || profileID < 1 {
+		return apperr.New(apperr.CodeInvalid, op, "provider profile id must be numeric")
+	}
+	channelIDs := make([]string, 0, len(channels))
+	for _, channel := range channels {
+		id := strings.TrimSpace(channel.ID)
+		if id == "" {
+			return apperr.New(apperr.CodeInvalid, op, "allowlist channel id is required")
+		}
+		channelIDs = append(channelIDs, id)
+	}
+	body := map[string]any{
+		"user_id":     profileID,
+		"channel_ids": channelIDs,
+	}
+	_, _, err = a.client.DoJSON(ctx, http.MethodPost, "/api/channels/reconcile", body)
+	if err != nil {
+		return apperr.Wrap(err, apperr.CodeUnavailable, op, "reconcile provider channels").
+			With("provider_profile_id", providerProfileID)
+	}
+	return nil
+}
+
 // ApplyPolicy patches child_config on a YT Zero profile.
 func (a *Adapter) ApplyPolicy(ctx context.Context, providerProfileID string, policy provider.PolicyPayload) (provider.ApplyResult, error) {
 	const op = "ytzero.Adapter.ApplyPolicy"

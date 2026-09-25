@@ -54,14 +54,15 @@ func (s *MemoryStore) Create(ctx context.Context, name, avatarColor string, poli
 	policy.Version = 1
 	policy.UpdatedAt = now
 	p := ChildProfile{
-		ID:          id,
-		Name:        name,
-		AvatarColor: avatarColor,
-		Policy:      policy,
-		SyncStatus:  SyncPending,
-		Version:     1,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		ID:               id,
+		Name:             name,
+		AvatarColor:      avatarColor,
+		AllowlistVersion: 1,
+		Policy:           policy,
+		SyncStatus:       SyncPending,
+		Version:          1,
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -99,6 +100,61 @@ func (s *MemoryStore) Get(ctx context.Context, id string) (ChildProfile, error) 
 	if !ok {
 		return ChildProfile{}, apperr.New(apperr.CodeNotFound, op, "child profile not found").With("id", id)
 	}
+	return p, nil
+}
+
+// ListAllowlist implements Store.
+func (s *MemoryStore) ListAllowlist(ctx context.Context, id string) ([]AllowlistChannel, error) {
+	const op = "controlplane.MemoryStore.ListAllowlist"
+	if err := requireServiceCtx(ctx, op); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p, ok := s.profiles[id]
+	if !ok {
+		return nil, apperr.New(apperr.CodeNotFound, op, "child profile not found").With("id", id)
+	}
+	out := append([]AllowlistChannel(nil), p.Allowlist...)
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].AddedAt.Equal(out[j].AddedAt) {
+			return out[i].ChannelID < out[j].ChannelID
+		}
+		return out[i].AddedAt.Before(out[j].AddedAt)
+	})
+	return out, nil
+}
+
+// ReplaceAllowlist implements Store with optimistic locking.
+func (s *MemoryStore) ReplaceAllowlist(ctx context.Context, id string, expectedVersion int64, channels []AllowlistChannel) (ChildProfile, error) {
+	const op = "controlplane.MemoryStore.ReplaceAllowlist"
+	if err := requireServiceCtx(ctx, op); err != nil {
+		return ChildProfile{}, err
+	}
+	normalized, err := NormalizeAllowlist(channels)
+	if err != nil {
+		return ChildProfile{}, apperr.Wrap(err, apperr.CodeInvalid, op, "validate allowlist")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p, ok := s.profiles[id]
+	if !ok {
+		return ChildProfile{}, apperr.New(apperr.CodeNotFound, op, "child profile not found").With("id", id)
+	}
+	if p.AllowlistVersion != expectedVersion {
+		return ChildProfile{}, apperr.New(apperr.CodeConflict, op, "allowlist version conflict").With("id", id)
+	}
+	now := s.clock().UTC()
+	p.AllowlistVersion++
+	p.Allowlist = make([]AllowlistChannel, len(normalized))
+	for i, channel := range normalized {
+		channel.AddedAt = now
+		p.Allowlist[i] = channel
+	}
+	p.SyncStatus = SyncPending
+	p.SyncError = ""
+	p.UpdatedAt = now
+	s.profiles[id] = p
 	return p, nil
 }
 

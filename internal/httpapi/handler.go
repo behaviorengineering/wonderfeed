@@ -57,6 +57,8 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	api.HandleFunc("POST /api/v1/parent/children", h.handleCreateChild)
 	api.HandleFunc("GET /api/v1/parent/children/{id}", h.handleGetChild)
 	api.HandleFunc("PUT /api/v1/parent/children/{id}/policy", h.handleUpdatePolicy)
+	api.HandleFunc("GET /api/v1/parent/children/{id}/allowlist", h.handleListAllowlist)
+	api.HandleFunc("PUT /api/v1/parent/children/{id}/allowlist", h.handleReplaceAllowlist)
 	api.HandleFunc("POST /api/v1/parent/children/{id}/sync", h.handleForceSync)
 	mux.Handle("/", h.Auth.Middleware(api))
 }
@@ -74,6 +76,11 @@ type createChildBody struct {
 type updatePolicyBody struct {
 	ExpectedVersion int64                    `json:"expected_version"`
 	Policy          controlplane.ChildPolicy `json:"policy"`
+}
+
+type replaceAllowlistBody struct {
+	ExpectedVersion int64                           `json:"expected_version"`
+	Channels        []controlplane.AllowlistChannel `json:"channels"`
 }
 
 func (h *Handler) withBudget(r *http.Request) (*http.Request, func()) {
@@ -147,6 +154,43 @@ func (h *Handler) handleUpdatePolicy(w http.ResponseWriter, r *http.Request) {
 	}
 	status := http.StatusOK
 	if out.SyncStatus == controlplane.SyncFailed || out.SyncStatus == controlplane.SyncPending {
+		status = http.StatusAccepted
+	}
+	writeJSON(w, status, out)
+}
+
+func (h *Handler) handleListAllowlist(w http.ResponseWriter, r *http.Request) {
+	r, cancel := h.withBudget(r)
+	defer cancel()
+	allowlist, version, err := h.Service.ListChildAllowlist(r.Context(), r.PathValue("id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"allowlist": allowlist,
+		"version":   version,
+	})
+}
+
+func (h *Handler) handleReplaceAllowlist(w http.ResponseWriter, r *http.Request) {
+	r, cancel := h.withBudget(r)
+	defer cancel()
+	var body replaceAllowlistBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, apperr.New(apperr.CodeInvalid, "httpapi.replaceAllowlist", "invalid JSON body"))
+		return
+	}
+	out, err := h.Service.ReplaceChildAllowlist(r.Context(), r.PathValue("id"), controlplane.ReplaceAllowlistRequest{
+		ExpectedVersion: body.ExpectedVersion,
+		Channels:        body.Channels,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	status := http.StatusOK
+	if out.SyncStatus != controlplane.SyncSynced {
 		status = http.StatusAccepted
 	}
 	writeJSON(w, status, out)

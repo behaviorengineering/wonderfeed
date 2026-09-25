@@ -2,6 +2,7 @@
 package controlplane
 
 import (
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -39,16 +40,66 @@ type ChildPolicy struct {
 
 // ChildProfile is a host-owned child identity with desired policy and sync state.
 type ChildProfile struct {
-	ID                string      `json:"id"`
-	Name              string      `json:"name"`
-	AvatarColor       string      `json:"avatar_color"`
-	ProviderProfileID string      `json:"provider_profile_id,omitempty"`
-	Policy            ChildPolicy `json:"policy"`
-	SyncStatus        SyncStatus  `json:"sync_status"`
-	SyncError         string      `json:"sync_error,omitempty"`
-	Version           int64       `json:"version"`
-	CreatedAt         time.Time   `json:"created_at"`
-	UpdatedAt         time.Time   `json:"updated_at"`
+	ID                string             `json:"id"`
+	Name              string             `json:"name"`
+	AvatarColor       string             `json:"avatar_color"`
+	ProviderProfileID string             `json:"provider_profile_id,omitempty"`
+	AllowlistVersion  int64              `json:"allowlist_version"`
+	Allowlist         []AllowlistChannel `json:"allowlist,omitempty"`
+	Policy            ChildPolicy        `json:"policy"`
+	SyncStatus        SyncStatus         `json:"sync_status"`
+	SyncError         string             `json:"sync_error,omitempty"`
+	Version           int64              `json:"version"`
+	CreatedAt         time.Time          `json:"created_at"`
+	UpdatedAt         time.Time          `json:"updated_at"`
+}
+
+// AllowlistChannel is a parent-approved channel in a child's feed source.
+type AllowlistChannel struct {
+	ChannelID string    `json:"channel_id"`
+	Title     string    `json:"title,omitempty"`
+	URL       string    `json:"url,omitempty"`
+	AddedAt   time.Time `json:"added_at"`
+}
+
+// NormalizeAllowlist validates and canonicalizes a replacement allowlist.
+func NormalizeAllowlist(in []AllowlistChannel) ([]AllowlistChannel, error) {
+	const op = "controlplane.NormalizeAllowlist"
+	if len(in) > 10000 {
+		return nil, apperr.New(apperr.CodeInvalid, op, "allowlist cannot contain more than 10000 channels")
+	}
+	out := make([]AllowlistChannel, 0, len(in))
+	seen := make(map[string]struct{}, len(in))
+	for _, entry := range in {
+		channelID := strings.TrimSpace(entry.ChannelID)
+		if channelID == "" {
+			return nil, apperr.New(apperr.CodeInvalid, op, "channel_id is required")
+		}
+		if len(channelID) > 128 || strings.ContainsAny(channelID, " \t\r\n/") {
+			return nil, apperr.New(apperr.CodeInvalid, op, "channel_id is invalid").With("channel_id", channelID)
+		}
+		if _, ok := seen[channelID]; ok {
+			return nil, apperr.New(apperr.CodeInvalid, op, "allowlist contains duplicate channel_id").
+				With("channel_id", channelID)
+		}
+		seen[channelID] = struct{}{}
+		channelURL := strings.TrimSpace(entry.URL)
+		if channelURL == "" {
+			channelURL = "https://www.youtube.com/channel/" + url.PathEscape(channelID)
+		} else {
+			parsed, err := url.Parse(channelURL)
+			if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+				return nil, apperr.New(apperr.CodeInvalid, op, "url must be an HTTP or HTTPS URL").
+					With("channel_id", channelID)
+			}
+		}
+		out = append(out, AllowlistChannel{
+			ChannelID: channelID,
+			Title:     strings.TrimSpace(entry.Title),
+			URL:       channelURL,
+		})
+	}
+	return out, nil
 }
 
 // DefaultChildPolicy returns fail-closed defaults for a new child profile.

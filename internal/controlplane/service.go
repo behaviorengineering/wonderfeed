@@ -68,6 +68,12 @@ type UpdatePolicyRequest struct {
 	Policy          ChildPolicy
 }
 
+// ReplaceAllowlistRequest is the parent input for replacing approved channels.
+type ReplaceAllowlistRequest struct {
+	ExpectedVersion int64
+	Channels        []AllowlistChannel
+}
+
 // CreateChildProfile persists desired state then syncs to the provider.
 func (s *Service) CreateChildProfile(ctx context.Context, req CreateChildRequest) (ChildProfile, error) {
 	const op = "controlplane.Service.CreateChildProfile"
@@ -96,23 +102,7 @@ func (s *Service) CreateChildProfile(ctx context.Context, req CreateChildRequest
 	if err != nil {
 		return ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "store provider profile id")
 	}
-	apply, err := s.provider.ApplyPolicy(ctx, prov.ID, toProviderPolicy(profile.Policy))
-	if err != nil {
-		s.logger.Error("provider apply failed", "op", op, "child_id", profile.ID, "err", err)
-		updated, recErr := s.store.RecordSyncStatus(ctx, profile.ID, SyncFailed, err.Error())
-		if recErr != nil {
-			return profile, apperr.Wrap(recErr, apperr.CodeFailed, op, "record sync failure after apply")
-		}
-		return updated, nil
-	}
-	if len(apply.Unsupported) > 0 {
-		s.logger.Info("provider applied with unsupported fields", "op", op, "child_id", profile.ID, "unsupported", apply.Unsupported)
-	}
-	updated, err := s.store.RecordSyncStatus(ctx, profile.ID, SyncSynced, "")
-	if err != nil {
-		return ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "record sync success")
-	}
-	return updated, nil
+	return s.syncProfile(ctx, op, profile)
 }
 
 // ListChildProfiles returns host-owned child profiles.
@@ -138,7 +128,50 @@ func (s *Service) GetChildProfile(ctx context.Context, id string) (ChildProfile,
 	if err != nil {
 		return ChildProfile{}, apperr.Wrap(err, codeOf(err, apperr.CodeFailed), op, "get profile")
 	}
+	allowlist, err := s.store.ListAllowlist(ctx, id)
+	if err != nil {
+		return ChildProfile{}, apperr.Wrap(err, codeOf(err, apperr.CodeFailed), op, "get allowlist")
+	}
+	out.Allowlist = allowlist
 	return out, nil
+}
+
+// ListChildAllowlist returns the host-owned approved channels for a child.
+func (s *Service) ListChildAllowlist(ctx context.Context, id string) ([]AllowlistChannel, int64, error) {
+	const op = "controlplane.Service.ListChildAllowlist"
+	if err := requireServiceCtx(ctx, op); err != nil {
+		return nil, 0, err
+	}
+	profile, err := s.store.Get(ctx, id)
+	if err != nil {
+		return nil, 0, apperr.Wrap(err, codeOf(err, apperr.CodeFailed), op, "get profile")
+	}
+	allowlist, err := s.store.ListAllowlist(ctx, id)
+	if err != nil {
+		return nil, 0, apperr.Wrap(err, codeOf(err, apperr.CodeFailed), op, "list allowlist")
+	}
+	return allowlist, profile.AllowlistVersion, nil
+}
+
+// ReplaceChildAllowlist persists desired channels first, then syncs the provider.
+func (s *Service) ReplaceChildAllowlist(ctx context.Context, id string, req ReplaceAllowlistRequest) (ChildProfile, error) {
+	const op = "controlplane.Service.ReplaceChildAllowlist"
+	if err := requireServiceCtx(ctx, op); err != nil {
+		return ChildProfile{}, err
+	}
+	profile, err := s.store.ReplaceAllowlist(ctx, id, req.ExpectedVersion, req.Channels)
+	if err != nil {
+		return ChildProfile{}, apperr.Wrap(err, codeOf(err, apperr.CodeFailed), op, "persist allowlist")
+	}
+	updated, err := s.syncProfile(ctx, op, profile)
+	if err != nil {
+		return ChildProfile{}, err
+	}
+	updated.Allowlist, err = s.store.ListAllowlist(ctx, id)
+	if err != nil {
+		return ChildProfile{}, apperr.Wrap(err, codeOf(err, apperr.CodeFailed), op, "load saved allowlist")
+	}
+	return updated, nil
 }
 
 // UpdateChildPolicy saves desired policy first, then attempts provider sync.
@@ -186,7 +219,19 @@ func (s *Service) syncProfile(ctx context.Context, op string, profile ChildProfi
 			return ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "store provider profile id")
 		}
 	}
-	_, err := s.provider.ApplyPolicy(ctx, profile.ProviderProfileID, toProviderPolicy(profile.Policy))
+	allowlist, err := s.store.ListAllowlist(ctx, profile.ID)
+	if err != nil {
+		return ChildProfile{}, apperr.Wrap(err, codeOf(err, apperr.CodeFailed), op, "load allowlist")
+	}
+	if err := s.provider.ApplyAllowlist(ctx, profile.ProviderProfileID, toProviderAllowlist(allowlist)); err != nil {
+		s.logger.Error("provider allowlist apply failed", "op", op, "child_id", profile.ID, "err", err)
+		updated, recErr := s.store.RecordSyncStatus(ctx, profile.ID, SyncFailed, err.Error())
+		if recErr != nil {
+			return profile, apperr.Wrap(recErr, apperr.CodeFailed, op, "record sync failure")
+		}
+		return updated, nil
+	}
+	apply, err := s.provider.ApplyPolicy(ctx, profile.ProviderProfileID, toProviderPolicy(profile.Policy))
 	if err != nil {
 		s.logger.Error("provider apply failed", "op", op, "child_id", profile.ID, "err", err)
 		updated, recErr := s.store.RecordSyncStatus(ctx, profile.ID, SyncFailed, err.Error())
@@ -194,6 +239,9 @@ func (s *Service) syncProfile(ctx context.Context, op string, profile ChildProfi
 			return profile, apperr.Wrap(recErr, apperr.CodeFailed, op, "record sync failure")
 		}
 		return updated, nil
+	}
+	if len(apply.Unsupported) > 0 {
+		s.logger.Info("provider applied with unsupported fields", "op", op, "child_id", profile.ID, "unsupported", apply.Unsupported)
 	}
 	updated, err := s.store.RecordSyncStatus(ctx, profile.ID, SyncSynced, "")
 	if err != nil {
@@ -222,6 +270,18 @@ func toProviderPolicy(p ChildPolicy) provider.PolicyPayload {
 		BedtimeStart:  p.BedtimeStart,
 		BedtimeEnd:    p.BedtimeEnd,
 	}
+}
+
+func toProviderAllowlist(channels []AllowlistChannel) []provider.Channel {
+	out := make([]provider.Channel, 0, len(channels))
+	for _, channel := range channels {
+		out = append(out, provider.Channel{
+			ID:    channel.ChannelID,
+			Title: channel.Title,
+			URL:   channel.URL,
+		})
+	}
+	return out
 }
 
 func codeOf(err error, fallback apperr.Code) apperr.Code {

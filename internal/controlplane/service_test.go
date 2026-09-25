@@ -56,6 +56,13 @@ func (f *fakeProvider) CreateChildProfile(ctx context.Context, name, avatarColor
 	return p, nil
 }
 
+func (f *fakeProvider) ApplyAllowlist(ctx context.Context, providerProfileID string, channels []provider.Channel) error {
+	if f.failApply {
+		return apperr.New(apperr.CodeUnavailable, "fake.ApplyAllowlist", "provider down")
+	}
+	return nil
+}
+
 func (f *fakeProvider) ApplyPolicy(ctx context.Context, providerProfileID string, policy provider.PolicyPayload) (provider.ApplyResult, error) {
 	if f.failApply {
 		return provider.ApplyResult{}, apperr.New(apperr.CodeUnavailable, "fake.Apply", "provider down")
@@ -145,6 +152,41 @@ func TestServiceUpdateConflict(t *testing.T) {
 	var ae *apperr.Error
 	if !errors.As(err, &ae) || ae.Code != apperr.CodeConflict {
 		t.Fatalf("got %#v", err)
+	}
+}
+
+func TestServiceReplaceAllowlist(t *testing.T) {
+	t.Parallel()
+	svc := testService(t, newFakeProvider())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	created, err := svc.CreateChildProfile(ctx, CreateChildRequest{Name: "Ada"})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	updated, err := svc.ReplaceChildAllowlist(ctx, created.ID, ReplaceAllowlistRequest{
+		ExpectedVersion: created.AllowlistVersion,
+		Channels: []AllowlistChannel{{
+			ChannelID: "UC-ada",
+			Title:     "Ada's channel",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("replace allowlist: %v", err)
+	}
+	if updated.SyncStatus != SyncSynced || updated.AllowlistVersion != 2 {
+		t.Fatalf("updated = %+v", updated)
+	}
+	if len(updated.Allowlist) != 1 || updated.Allowlist[0].ChannelID != "UC-ada" {
+		t.Fatalf("allowlist = %+v", updated.Allowlist)
+	}
+	_, err = svc.ReplaceChildAllowlist(ctx, created.ID, ReplaceAllowlistRequest{
+		ExpectedVersion: created.AllowlistVersion,
+	})
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.Code != apperr.CodeConflict {
+		t.Fatalf("expected allowlist conflict, got %v", err)
 	}
 }
 
