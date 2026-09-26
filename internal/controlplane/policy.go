@@ -2,11 +2,14 @@
 package controlplane
 
 import (
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/behaviorengineering/wonderfeed/internal/apperr"
+	"github.com/behaviorengineering/wonderfeed/internal/provider"
 )
 
 // SyncStatus is the provider synchronization state for a desired policy.
@@ -39,16 +42,98 @@ type ChildPolicy struct {
 
 // ChildProfile is a host-owned child identity with desired policy and sync state.
 type ChildProfile struct {
-	ID                string      `json:"id"`
-	Name              string      `json:"name"`
-	AvatarColor       string      `json:"avatar_color"`
-	ProviderProfileID string      `json:"provider_profile_id,omitempty"`
-	Policy            ChildPolicy `json:"policy"`
-	SyncStatus        SyncStatus  `json:"sync_status"`
-	SyncError         string      `json:"sync_error,omitempty"`
-	Version           int64       `json:"version"`
-	CreatedAt         time.Time   `json:"created_at"`
-	UpdatedAt         time.Time   `json:"updated_at"`
+	ID                string             `json:"id"`
+	Name              string             `json:"name"`
+	AvatarColor       string             `json:"avatar_color"`
+	ProviderProfileID string             `json:"provider_profile_id,omitempty"`
+	AllowlistVersion  int64              `json:"allowlist_version"`
+	Allowlist         []AllowlistChannel `json:"allowlist,omitempty"`
+	Policy            ChildPolicy        `json:"policy"`
+	SyncStatus        SyncStatus         `json:"sync_status"`
+	SyncError         string             `json:"sync_error,omitempty"`
+	Version           int64              `json:"version"`
+	CreatedAt         time.Time          `json:"created_at"`
+	UpdatedAt         time.Time          `json:"updated_at"`
+}
+
+// AllowlistChannel is a parent-approved provider feed source for a child.
+type AllowlistChannel struct {
+	Provider   string    `json:"provider"`
+	ExternalID string    `json:"external_id"`
+	Title      string    `json:"title,omitempty"`
+	URL        string    `json:"url,omitempty"`
+	AddedAt    time.Time `json:"added_at"`
+}
+
+var youtubeChannelID = regexp.MustCompile(`^UC[\w-]{22}$`)
+
+// NormalizeAllowlistEntry validates one provider-scoped allowlist entry.
+func NormalizeAllowlistEntry(entry AllowlistChannel) (AllowlistChannel, error) {
+	const op = "controlplane.NormalizeAllowlistEntry"
+	providerKey := strings.ToLower(strings.TrimSpace(entry.Provider))
+	if providerKey == "" {
+		providerKey = provider.ProviderYouTube
+	}
+	externalID := strings.TrimSpace(entry.ExternalID)
+	if externalID == "" {
+		return AllowlistChannel{}, apperr.New(apperr.CodeInvalid, op, "external_id is required")
+	}
+	if len(externalID) > 128 || strings.ContainsAny(externalID, " \t\r\n/") {
+		return AllowlistChannel{}, apperr.New(apperr.CodeInvalid, op, "external_id is invalid").
+			With("external_id", externalID)
+	}
+	if err := validateProviderExternalID(providerKey, externalID); err != nil {
+		return AllowlistChannel{}, err
+	}
+	channelURL := strings.TrimSpace(entry.URL)
+	if channelURL == "" {
+		channelURL = defaultChannelURL(providerKey, externalID)
+	} else {
+		parsed, err := url.Parse(channelURL)
+		if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+			return AllowlistChannel{}, apperr.New(apperr.CodeInvalid, op, "url must be an HTTP or HTTPS URL").
+				With("external_id", externalID)
+		}
+	}
+	return AllowlistChannel{
+		Provider:   providerKey,
+		ExternalID: externalID,
+		Title:      strings.TrimSpace(entry.Title),
+		URL:        channelURL,
+	}, nil
+}
+
+func validateProviderExternalID(providerKey, externalID string) error {
+	const op = "controlplane.NormalizeAllowlistEntry"
+	switch providerKey {
+	case provider.ProviderYouTube:
+		if !youtubeChannelID.MatchString(externalID) {
+			return apperr.New(apperr.CodeInvalid, op, "youtube external_id must be a UC channel id").
+				With("external_id", externalID)
+		}
+		return nil
+	default:
+		return apperr.New(apperr.CodeInvalid, op, "unsupported provider").With("provider", providerKey)
+	}
+}
+
+func defaultChannelURL(providerKey, externalID string) string {
+	switch providerKey {
+	case provider.ProviderYouTube:
+		return "https://www.youtube.com/channel/" + url.PathEscape(externalID)
+	default:
+		return ""
+	}
+}
+
+// ToProviderScoped converts a host allowlist entry for provider sync.
+func (c AllowlistChannel) ToProviderScoped() provider.ScopedChannel {
+	return provider.ScopedChannel{
+		Provider:   c.Provider,
+		ExternalID: c.ExternalID,
+		Title:      c.Title,
+		URL:        c.URL,
+	}
 }
 
 // DefaultChildPolicy returns fail-closed defaults for a new child profile.

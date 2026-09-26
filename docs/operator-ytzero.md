@@ -96,6 +96,18 @@ Optional S3-compatible upload (R2/B2/MinIO) uses `WONDERFEED_BACKUP_S3_*` in `.e
 3. Override images with `YTZERO_IMAGE` / `POSTGRES_IMAGE` when needed.
 4. Child profiles and feed policy stay in the YT Zero UI; record product gaps in `docs/roadmap.md`.
 
+## Control plane allowlist sync
+
+When running `wonderfeed control serve`, set `DATABASE_URL` to the same
+PostgreSQL database YT Zero uses (`postgresql://...@127.0.0.1:5432/ytzero`).
+The control plane persists provider-scoped allowlist CRUD in `wonderfeed.*`
+tables, then writes YT Zero `channels` / `user_channels` rows directly
+(experimental; couples to the provider schema in that database).
+
+Policy patches still use the HTTP adapter. Set `YTZERO_SESSION_COOKIE` only when
+YT Zero auth requires an admin session for `PATCH /api/profiles/{id}`.
+Allowlist membership does not use provider HTTP routes or child-profile cookies.
+
 ## Switching from SQLite
 
 This overlay always sets `DATABASE_URL`. Upstream YT Zero will initialize a **new** PostgreSQL database on a clean install. If `data/ytzero` already has a populated SQLite file from an older host run, YT Zero refuses automatic switch; use YT Zero **Settings → Dangerous → Database** to migrate, or start fresh by stopping the stack and removing the old SQLite files under `data/ytzero/db/` (only if you accept data loss).

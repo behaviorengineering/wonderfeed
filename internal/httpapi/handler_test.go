@@ -16,6 +16,18 @@ import (
 
 type okProvider struct{}
 
+type noopAllowlistSync struct{}
+
+func (noopAllowlistSync) AddMembership(ctx context.Context, providerProfileID string, channel provider.ScopedChannel) error {
+	return nil
+}
+func (noopAllowlistSync) RemoveMembership(ctx context.Context, providerProfileID string, channel provider.ScopedChannel) error {
+	return nil
+}
+func (noopAllowlistSync) ReconcileAll(ctx context.Context, providerProfileID string, channels []provider.ScopedChannel) error {
+	return nil
+}
+
 func (okProvider) ListChildProfiles(ctx context.Context) ([]provider.Profile, error) {
 	return nil, nil
 }
@@ -30,10 +42,11 @@ func testHandler(t *testing.T, authKey string) http.Handler {
 	t.Helper()
 	now := time.Date(2026, 9, 25, 3, 0, 0, 0, time.UTC)
 	svc := controlplane.NewService(controlplane.ServiceConfig{
-		Store:    controlplane.NewMemoryStore(func() time.Time { return now }),
-		Provider: okProvider{},
-		Clock:    func() time.Time { return now },
-		Logger:   slog.Default(),
+		Store:         controlplane.NewMemoryStore(func() time.Time { return now }),
+		Provider:      okProvider{},
+		AllowlistSync: &noopAllowlistSync{},
+		Clock:         func() time.Time { return now },
+		Logger:        slog.Default(),
 	})
 	h := NewHandler(HandlerConfig{Service: svc, ParentAuthKey: authKey})
 	mux := http.NewServeMux()
@@ -98,5 +111,47 @@ func TestCreateChildOK(t *testing.T) {
 	mux.ServeHTTP(rr, req)
 	if rr.Code != http.StatusCreated {
 		t.Fatalf("code = %d body=%s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestAllowlistRoutes(t *testing.T) {
+	t.Parallel()
+	mux := testHandler(t, "")
+
+	create := httptest.NewRequest(http.MethodPost, "/api/v1/parent/children", bytes.NewBufferString(`{"name":"Ada"}`))
+	createRR := httptest.NewRecorder()
+	mux.ServeHTTP(createRR, create)
+	if createRR.Code != http.StatusCreated {
+		t.Fatalf("create code = %d body=%s", createRR.Code, createRR.Body.String())
+	}
+	var child controlplane.ChildProfile
+	if err := json.Unmarshal(createRR.Body.Bytes(), &child); err != nil {
+		t.Fatal(err)
+	}
+
+	const channelID = "UCaaaaaaaaaaaaaaaaaaaaaa"
+	add := httptest.NewRequest(http.MethodPost, "/api/v1/parent/children/"+child.ID+"/allowlist",
+		bytes.NewBufferString(`{"expected_version":1,"provider":"youtube","external_id":"`+channelID+`","title":"Ada"}`))
+	addRR := httptest.NewRecorder()
+	mux.ServeHTTP(addRR, add)
+	if addRR.Code != http.StatusCreated {
+		t.Fatalf("add code = %d body=%s", addRR.Code, addRR.Body.String())
+	}
+
+	list := httptest.NewRequest(http.MethodGet, "/api/v1/parent/children/"+child.ID+"/allowlist", nil)
+	listRR := httptest.NewRecorder()
+	mux.ServeHTTP(listRR, list)
+	if listRR.Code != http.StatusOK {
+		t.Fatalf("list code = %d body=%s", listRR.Code, listRR.Body.String())
+	}
+	var body struct {
+		Allowlist []controlplane.AllowlistChannel `json:"allowlist"`
+		Version   int64                           `json:"version"`
+	}
+	if err := json.Unmarshal(listRR.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Version != 2 || len(body.Allowlist) != 1 || body.Allowlist[0].ExternalID != channelID {
+		t.Fatalf("body = %+v", body)
 	}
 }
