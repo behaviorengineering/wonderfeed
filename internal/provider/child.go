@@ -28,17 +28,9 @@ type ApplyResult struct {
 	Unsupported       []string
 }
 
-// Channel is a parent-approved provider channel.
-type Channel struct {
-	ID    string
-	Title string
-	URL   string
-}
-
 // ChildProfileProvider syncs child profiles and policies to an interchangeable media provider.
 type ChildProfileProvider interface {
 	ListChildProfiles(ctx context.Context) ([]Profile, error)
 	CreateChildProfile(ctx context.Context, name, avatarColor string) (Profile, error)
-	ApplyAllowlist(ctx context.Context, providerProfileID string, channels []Channel) error
 	ApplyPolicy(ctx context.Context, providerProfileID string, policy PolicyPayload) (ApplyResult, error)
 }

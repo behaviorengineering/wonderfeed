@@ -49,7 +49,8 @@ Environment:
   WONDERFEED_CONTROL_BIND     Listen address (default 127.0.0.1:8080)
   DATABASE_URL                PostgreSQL DSN (required)
   YTZERO_BASE_URL             Provider base URL (default http://127.0.0.1:3001)
-  YTZERO_SESSION_COOKIE       Optional Cookie header for provider API auth
+  YTZERO_SESSION_COOKIE       Optional Cookie header for provider policy HTTP auth
+  DATABASE_URL                Same PostgreSQL as YT Zero (required; also used for allowlist DB sync)
   WONDERFEED_PARENT_AUTH_KEY  Required for non-loopback binds
 
 `)
@@ -122,11 +123,13 @@ Starts the parent control-plane HTTP API. Binds to WONDERFEED_CONTROL_BIND
 		SessionCookie: cfg.ProviderSessionCookie,
 		HTTP:          http.DefaultClient,
 	})
+	allowlistSync := ytzero.NewPgAllowlistSync(pool)
 	svc := controlplane.NewService(controlplane.ServiceConfig{
-		Store:    st,
-		Provider: adapter,
-		Clock:    time.Now,
-		Logger:   logger,
+		Store:         st,
+		Provider:      adapter,
+		AllowlistSync: allowlistSync,
+		Clock:         time.Now,
+		Logger:        logger,
 	})
 	handler := httpapi.NewHandler(httpapi.HandlerConfig{
 		Service:       svc,

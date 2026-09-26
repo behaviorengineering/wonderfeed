@@ -86,6 +86,10 @@ provider now and replace the child surface later.
 
 **Exit gate:** met by ADR 0002, including rejected alternatives and AGPL-3.0 licensing implications.
 
+## Provider scope (product, not schedule)
+
+Wonderfeed is **YouTube-first in implementation** because YT Zero is the first mounted provider. The control plane is **not YouTube-exclusive**: allowlist entries are provider-scoped (`provider` + `external_id`), and the same parent-owned curation model applies to any future algorithmic catalog (for example Netflix-style feeds). A well-known brand does not replace allowlist-first policy or fail-closed playback.
+
 ## Milestone 3: Parent control plane MVP
 
 Minimum host-owned capabilities (may be adapters over provider features):
@@ -93,7 +97,7 @@ Minimum host-owned capabilities (may be adapters over provider features):
 - [x] Host-owned child profile + policy API (`wonderfeed control serve`) with provider adapter seam
 - [x] Durable desired policy in host PostgreSQL (`wonderfeed.*`) with sync status
 - [x] Fail-closed bind: non-loopback requires `WONDERFEED_PARENT_AUTH_KEY`
-- [x] Channel allowlist management with a versioned, exportable JSON source of truth
+- [x] Provider-scoped channel allowlist CRUD with a versioned, exportable JSON source of truth
 - [ ] Parent activity view (what played, what was rejected, pending requests if any)
 - [ ] Child cannot widen allowlists from the child surface (hard guarantee beyond YT Zero PIN)
 

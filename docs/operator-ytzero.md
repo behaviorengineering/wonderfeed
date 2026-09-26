@@ -98,15 +98,15 @@ Optional S3-compatible upload (R2/B2/MinIO) uses `WONDERFEED_BACKUP_S3_*` in `.e
 
 ## Control plane allowlist sync
 
-When running `wonderfeed control serve`, set `YTZERO_SESSION_COOKIE` to a
-household **admin** session cookie (`ytzero_session=...` from logging in as the
-primary profile or another administrator). The adapter syncs host allowlists
-through YT Zero `POST /api/channels/reconcile`; it does not impersonate the
-child profile or require a child-lock unlock PIN.
+When running `wonderfeed control serve`, set `DATABASE_URL` to the same
+PostgreSQL database YT Zero uses (`postgresql://...@127.0.0.1:5432/ytzero`).
+The control plane persists provider-scoped allowlist CRUD in `wonderfeed.*`
+tables, then writes YT Zero `channels` / `user_channels` rows directly
+(experimental; couples to the provider schema in that database).
 
-Rebuild `wonderfeed-ytzero:src-patch` after bumping the `providers/ytzero`
-gitlink so the running image includes the reconcile route
-(`make provider-image`).
+Policy patches still use the HTTP adapter. Set `YTZERO_SESSION_COOKIE` only when
+YT Zero auth requires an admin session for `PATCH /api/profiles/{id}`.
+Allowlist membership does not use provider HTTP routes or child-profile cookies.
 
 ## Switching from SQLite
 
@@ -118,7 +118,6 @@ This overlay always sets `DATABASE_URL`. Upstream YT Zero will initialize a **ne
 | --- | --- |
 | Git submodule `providers/ytzero` | Source and docs reference for the accepted ADR pin (`2026.09.8` / matching SHA) |
 | `deploy/ytzero/src-overlay/` | Host-owned Postgres cold-start patches applied by `Dockerfile.src-patch` until upstream ships them |
-| `providers/ytzero` @ pinned SHA | `channelRoutes.ts` copied into src-patch image for admin allowlist reconcile until upstream image includes it |
 | `make provider-image` → `wonderfeed-ytzero:src-patch` | Host default runtime: base `ghcr.io/pelski/ytzero:2026.09.8` + src-overlay |
 | Compose `YTZERO_IMAGE` | Override; `.env.example` defaults to `wonderfeed-ytzero:src-patch` |
 | Compose `POSTGRES_IMAGE` (default `postgres:17-alpine`) | Runtime database image |

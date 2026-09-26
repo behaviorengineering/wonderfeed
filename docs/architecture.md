@@ -8,8 +8,8 @@ Wonderfeed is a **host repository** with provider submodules. A host Go CLI runs
 Parent device (authenticated HTTP)
   -> Wonderfeed control plane (internal/controlplane + internal/httpapi)
     -> host-owned wonderfeed.* tables in PostgreSQL
-    -> provider.ChildProfileProvider adapter
-      -> YT Zero HTTP API (profiles / child_config / followed channels)
+    -> provider.ChildProfileProvider adapter (policy + profiles via YT Zero HTTP)
+    -> provider.AllowlistSynchronizer (experimental direct writes to YT Zero tables in shared PostgreSQL)
     -> provider-owned feed state and playback links
 ```
 
@@ -60,7 +60,7 @@ flowchart TD
 
 ### 1. Curation and feed state
 
-Trusted channels, tags, automatic rules, archive/reject flows, and chronological inbox behavior. Wonderfeed now owns the parent-approved channel allowlist in PostgreSQL and reconciles it to the selected provider child profile. YT Zero implements the resulting subscription inbox without Google login or YouTube Data API keys.
+Trusted channels, tags, automatic rules, archive/reject flows, and chronological inbox behavior. Wonderfeed owns the parent-approved allowlist in PostgreSQL as provider-scoped entries (`youtube` first) and syncs membership into the selected YT Zero child profile through an experimental host-side PostgreSQL writer. YT Zero still implements the resulting subscription inbox and playback without Google login or YouTube Data API keys. The roadmap is YouTube-first, not YouTube-only: future providers plug into the same control-plane API and curation rules.
 
 ### 2. Parent approval and policy
 
@@ -90,7 +90,7 @@ These are the places a future host adapter will touch first:
 2. **Feed listing** — chronological uploads from allowlisted channels, with format filters.
 3. **Triage states** — watch / schedule / archive / reject as durable host or provider state.
 4. **Profile and limit APIs** — Wonderfeed `ChildProfileProvider` maps host policy onto provider profiles (YT Zero `/api/profiles` today).
-5. **Allowlist API** — parent-only versioned JSON at `/api/v1/parent/children/{id}/allowlist`; provider reconciliation calls YT Zero `POST /api/channels/reconcile` with the child profile id and desired channel ids (admin session).
+5. **Allowlist API** — parent-only CRUD at `/api/v1/parent/children/{id}/allowlist` and `/allowlist/{provider}/{external_id}`; host sync writes YT Zero `user_channels` rows in the shared PostgreSQL database (no provider source changes required).
 6. **Playback handoff** — approved `videoId` into an embed or provider player, never unrestricted search.
 
 Host control-plane persistence lives in PostgreSQL schema `wonderfeed` (migrations embedded under `internal/controlplane/store/migrations/`). Provider ops remain documented in [operator-ytzero.md](operator-ytzero.md). Start the API with `wonderfeed control serve` (loopback by default; non-loopback requires `WONDERFEED_PARENT_AUTH_KEY`).
@@ -101,8 +101,7 @@ Host control-plane persistence lives in PostgreSQL schema `wonderfeed` (migratio
 - Privacy-enhanced (`youtube-nocookie`) embeds conflict with reliable Premium session recognition. Prefer ordinary `youtube.com` embeds when Premium is required.
 - Third-party frontends that avoid Google login generally cannot inherit YouTube Premium entitlements.
 - YT Zero is a strong foundation for "manage your own algorithm," not a complete substitute for OS lockdown.
-- Allowlist sync requires a household admin YT Zero session (`YTZERO_SESSION_COOKIE`).
-  Child-profile cookies and child-lock unlock are not used for reconciliation.
+- Allowlist sync is experimental and schema-coupled: it requires the household PostgreSQL DSN used by both Wonderfeed and YT Zero (`DATABASE_URL`). Policy patches may still use `YTZERO_SESSION_COOKIE` when HTTP auth is enabled.
 - Preventing a child from widening the allowlist inside the provider UI remains
   a separate enforcement problem (permissions, child lock, and future host UI).
 

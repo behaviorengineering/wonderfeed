@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
@@ -98,46 +97,6 @@ func TestResilientClientRequiresDeadline(t *testing.T) {
 	_, _, err := c.DoJSON(context.Background(), http.MethodGet, "/api/profiles", nil)
 	if err == nil {
 		t.Fatal("expected missing deadline error")
-	}
-}
-
-func TestAdapterApplyAllowlistUsesAdminReconcile(t *testing.T) {
-	t.Parallel()
-	var gotBody map[string]any
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/api/channels/reconcile" {
-			http.NotFound(w, r)
-			return
-		}
-		if strings.Contains(r.Header.Get("Cookie"), "ytzero_profile=") {
-			t.Errorf("unexpected child profile cookie: %q", r.Header.Get("Cookie"))
-		}
-		if !strings.Contains(r.Header.Get("Cookie"), "ytzero_session=secret") {
-			t.Errorf("cookie = %q", r.Header.Get("Cookie"))
-		}
-		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
-			t.Errorf("decode body: %v", err)
-		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"ok": true, "followed": 1, "unfollowed": 0})
-	}))
-	defer srv.Close()
-
-	a := NewAdapter(AdapterConfig{
-		BaseURL:       srv.URL,
-		SessionCookie: "ytzero_session=secret",
-		HTTP:          srv.Client(),
-	})
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := a.ApplyAllowlist(ctx, "9", []provider.Channel{{ID: "UC-new", Title: "New"}}); err != nil {
-		t.Fatalf("apply allowlist: %v", err)
-	}
-	if int(gotBody["user_id"].(float64)) != 9 {
-		t.Fatalf("user_id = %#v", gotBody["user_id"])
-	}
-	ids, ok := gotBody["channel_ids"].([]any)
-	if !ok || len(ids) != 1 || ids[0] != "UC-new" {
-		t.Fatalf("channel_ids = %#v", gotBody["channel_ids"])
 	}
 }
 

@@ -22,6 +22,7 @@ Wonderfeed targets the gap: a **parent-owned recommender and control layer** tha
 4. **Separate concerns.** Channel curation, parent approval, device/browser enforcement, and playback entitlement are different layers. Do not pretend one embed parameter solves all of them.
 5. **Providers stay portable.** Upstream tools like YT Zero remain independent. Wonderfeed adapts; it does not spill host brand into provider trees.
 6. **Fail closed for children.** Ambiguous policy means no playback, not "probably fine."
+7. **Algorithmic feeds need curation everywhere.** YouTube is the first integration path, not proof that a platform is child-safe. Netflix, YouTube, and other recommendation catalogs can surface unsuitable material; Wonderfeed applies the same allowlist, approval, and feed-policy rules regardless of provider brand.
 
 ## Non-goals (near term)
 
@@ -49,8 +50,9 @@ A first useful release is successful when:
 | Provider | An upstream system mounted under `providers/` that supplies feed/inbox/player capabilities |
 | Control plane | Parent-facing policy, approval, and session rules |
 | Child surface | The locked-down presentation children use to watch |
-| Allowlist | Explicit set of channels and/or videos permitted to play |
+| Allowlist | Explicit set of provider-scoped sources (for example YouTube channels) and/or videos permitted to play |
 | Feed policy | Rules that shape order, diversity, format filters, and session length |
+| Video provider | Upstream catalog and playback system (YouTube via YT Zero first; others later behind the same control-plane API) |
 
 ## Canonical references
 

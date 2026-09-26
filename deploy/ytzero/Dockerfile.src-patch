@@ -5,5 +5,3 @@
 ARG YTZERO_BASE=ghcr.io/pelski/ytzero:2026.09.8
 FROM ${YTZERO_BASE}
 COPY deploy/ytzero/src-overlay/ /app/src/
-# Host-pinned provider API until upstream release image includes it.
-COPY providers/ytzero/app/src/routes/channelRoutes.ts /app/src/routes/channelRoutes.ts

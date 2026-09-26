@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -58,7 +59,10 @@ func (h *Handler) Mount(mux *http.ServeMux) {
 	api.HandleFunc("GET /api/v1/parent/children/{id}", h.handleGetChild)
 	api.HandleFunc("PUT /api/v1/parent/children/{id}/policy", h.handleUpdatePolicy)
 	api.HandleFunc("GET /api/v1/parent/children/{id}/allowlist", h.handleListAllowlist)
-	api.HandleFunc("PUT /api/v1/parent/children/{id}/allowlist", h.handleReplaceAllowlist)
+	api.HandleFunc("POST /api/v1/parent/children/{id}/allowlist", h.handleAddAllowlistEntry)
+	api.HandleFunc("GET /api/v1/parent/children/{id}/allowlist/{provider}/{external_id}", h.handleGetAllowlistEntry)
+	api.HandleFunc("PATCH /api/v1/parent/children/{id}/allowlist/{provider}/{external_id}", h.handlePatchAllowlistEntry)
+	api.HandleFunc("DELETE /api/v1/parent/children/{id}/allowlist/{provider}/{external_id}", h.handleDeleteAllowlistEntry)
 	api.HandleFunc("POST /api/v1/parent/children/{id}/sync", h.handleForceSync)
 	mux.Handle("/", h.Auth.Middleware(api))
 }
@@ -78,9 +82,18 @@ type updatePolicyBody struct {
 	Policy          controlplane.ChildPolicy `json:"policy"`
 }
 
-type replaceAllowlistBody struct {
-	ExpectedVersion int64                           `json:"expected_version"`
-	Channels        []controlplane.AllowlistChannel `json:"channels"`
+type addAllowlistBody struct {
+	ExpectedVersion int64 `json:"expected_version"`
+	Provider        string `json:"provider"`
+	ExternalID      string `json:"external_id"`
+	ChannelID       string `json:"channel_id"`
+	Title           string `json:"title"`
+	URL             string `json:"url"`
+}
+
+type patchAllowlistBody struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
 }
 
 func (h *Handler) withBudget(r *http.Request) (*http.Request, func()) {
@@ -173,17 +186,78 @@ func (h *Handler) handleListAllowlist(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) handleReplaceAllowlist(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) handleAddAllowlistEntry(w http.ResponseWriter, r *http.Request) {
 	r, cancel := h.withBudget(r)
 	defer cancel()
-	var body replaceAllowlistBody
+	var body addAllowlistBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, apperr.New(apperr.CodeInvalid, "httpapi.replaceAllowlist", "invalid JSON body"))
+		writeError(w, apperr.New(apperr.CodeInvalid, "httpapi.addAllowlist", "invalid JSON body"))
 		return
 	}
-	out, err := h.Service.ReplaceChildAllowlist(r.Context(), r.PathValue("id"), controlplane.ReplaceAllowlistRequest{
+	externalID := strings.TrimSpace(body.ExternalID)
+	if externalID == "" {
+		externalID = strings.TrimSpace(body.ChannelID)
+	}
+	out, err := h.Service.AddChildAllowlistEntry(r.Context(), r.PathValue("id"), controlplane.AddAllowlistEntryRequest{
 		ExpectedVersion: body.ExpectedVersion,
-		Channels:        body.Channels,
+		Entry: controlplane.AllowlistChannel{
+			Provider:   body.Provider,
+			ExternalID: externalID,
+			Title:      body.Title,
+			URL:        body.URL,
+		},
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	status := http.StatusCreated
+	if out.SyncStatus != controlplane.SyncSynced {
+		status = http.StatusAccepted
+	}
+	writeJSON(w, status, out)
+}
+
+func (h *Handler) handleGetAllowlistEntry(w http.ResponseWriter, r *http.Request) {
+	r, cancel := h.withBudget(r)
+	defer cancel()
+	entry, err := h.Service.GetChildAllowlistEntry(r.Context(), r.PathValue("id"), r.PathValue("provider"), r.PathValue("external_id"))
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, entry)
+}
+
+func (h *Handler) handlePatchAllowlistEntry(w http.ResponseWriter, r *http.Request) {
+	r, cancel := h.withBudget(r)
+	defer cancel()
+	var body patchAllowlistBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, apperr.New(apperr.CodeInvalid, "httpapi.patchAllowlist", "invalid JSON body"))
+		return
+	}
+	entry, err := h.Service.UpdateChildAllowlistEntry(r.Context(), r.PathValue("id"), r.PathValue("provider"), r.PathValue("external_id"), controlplane.UpdateAllowlistEntryRequest{
+		Title: body.Title,
+		URL:   body.URL,
+	})
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, entry)
+}
+
+func (h *Handler) handleDeleteAllowlistEntry(w http.ResponseWriter, r *http.Request) {
+	r, cancel := h.withBudget(r)
+	defer cancel()
+	expectedVersion, err := parseExpectedVersionQuery(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	out, err := h.Service.DeleteChildAllowlistEntry(r.Context(), r.PathValue("id"), r.PathValue("provider"), r.PathValue("external_id"), controlplane.DeleteAllowlistEntryRequest{
+		ExpectedVersion: expectedVersion,
 	})
 	if err != nil {
 		writeError(w, err)
@@ -194,6 +268,19 @@ func (h *Handler) handleReplaceAllowlist(w http.ResponseWriter, r *http.Request)
 		status = http.StatusAccepted
 	}
 	writeJSON(w, status, out)
+}
+
+func parseExpectedVersionQuery(r *http.Request) (int64, error) {
+	const op = "httpapi.parseExpectedVersionQuery"
+	raw := strings.TrimSpace(r.URL.Query().Get("expected_version"))
+	if raw == "" {
+		return 0, apperr.New(apperr.CodeInvalid, op, "expected_version query parameter is required")
+	}
+	version, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || version < 1 {
+		return 0, apperr.New(apperr.CodeInvalid, op, "expected_version must be a positive integer")
+	}
+	return version, nil
 }
 
 func (h *Handler) handleForceSync(w http.ResponseWriter, r *http.Request) {

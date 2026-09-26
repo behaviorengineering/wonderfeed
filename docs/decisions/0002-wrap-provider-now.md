@@ -56,8 +56,9 @@ separate AGPL compliance review.
 
 - The first release can ship with a working provider UI.
 - Parent allowlist state is portable and independent of provider storage.
-- The adapter must reconcile provider profile state through YT Zero
-  `POST /api/channels/reconcile` (admin session) and must fail closed when
-  synchronization is incomplete.
+- The host syncs allowlist membership through an experimental PostgreSQL writer
+  against YT Zero tables in the shared household database (no provider source
+  changes). Policy continues through the HTTP adapter. Sync must fail closed when
+  incomplete.
 - A future child surface can replace YT Zero presentation behind the existing
   host control-plane API.

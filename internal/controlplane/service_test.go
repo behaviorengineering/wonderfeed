@@ -56,13 +56,6 @@ func (f *fakeProvider) CreateChildProfile(ctx context.Context, name, avatarColor
 	return p, nil
 }
 
-func (f *fakeProvider) ApplyAllowlist(ctx context.Context, providerProfileID string, channels []provider.Channel) error {
-	if f.failApply {
-		return apperr.New(apperr.CodeUnavailable, "fake.ApplyAllowlist", "provider down")
-	}
-	return nil
-}
-
 func (f *fakeProvider) ApplyPolicy(ctx context.Context, providerProfileID string, policy provider.PolicyPayload) (provider.ApplyResult, error) {
 	if f.failApply {
 		return provider.ApplyResult{}, apperr.New(apperr.CodeUnavailable, "fake.Apply", "provider down")
@@ -70,14 +63,42 @@ func (f *fakeProvider) ApplyPolicy(ctx context.Context, providerProfileID string
 	return provider.ApplyResult{ProviderProfileID: providerProfileID}, nil
 }
 
+type fakeAllowlistSync struct {
+	fail bool
+}
+
+func (f *fakeAllowlistSync) AddMembership(ctx context.Context, providerProfileID string, channel provider.ScopedChannel) error {
+	if f.fail {
+		return apperr.New(apperr.CodeUnavailable, "fake.AddMembership", "provider down")
+	}
+	return nil
+}
+
+func (f *fakeAllowlistSync) RemoveMembership(ctx context.Context, providerProfileID string, channel provider.ScopedChannel) error {
+	if f.fail {
+		return apperr.New(apperr.CodeUnavailable, "fake.RemoveMembership", "provider down")
+	}
+	return nil
+}
+
+func (f *fakeAllowlistSync) ReconcileAll(ctx context.Context, providerProfileID string, channels []provider.ScopedChannel) error {
+	if f.fail {
+		return apperr.New(apperr.CodeUnavailable, "fake.ReconcileAll", "provider down")
+	}
+	return nil
+}
+
+const testYouTubeChannelID = "UCaaaaaaaaaaaaaaaaaaaaaa"
+
 func testService(t *testing.T, prov provider.ChildProfileProvider) *Service {
 	t.Helper()
 	now := time.Date(2026, 9, 25, 2, 0, 0, 0, time.UTC)
 	return NewService(ServiceConfig{
-		Store:    NewMemoryStore(func() time.Time { return now }),
-		Provider: prov,
-		Clock:    func() time.Time { return now },
-		Logger:   slog.Default(),
+		Store:         NewMemoryStore(func() time.Time { return now }),
+		Provider:      prov,
+		AllowlistSync: &fakeAllowlistSync{},
+		Clock:         func() time.Time { return now },
+		Logger:        slog.Default(),
 	})
 }
 
@@ -155,7 +176,7 @@ func TestServiceUpdateConflict(t *testing.T) {
 	}
 }
 
-func TestServiceReplaceAllowlist(t *testing.T) {
+func TestServiceAddAllowlistEntry(t *testing.T) {
 	t.Parallel()
 	svc := testService(t, newFakeProvider())
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -165,24 +186,29 @@ func TestServiceReplaceAllowlist(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
-	updated, err := svc.ReplaceChildAllowlist(ctx, created.ID, ReplaceAllowlistRequest{
+	updated, err := svc.AddChildAllowlistEntry(ctx, created.ID, AddAllowlistEntryRequest{
 		ExpectedVersion: created.AllowlistVersion,
-		Channels: []AllowlistChannel{{
-			ChannelID: "UC-ada",
-			Title:     "Ada's channel",
-		}},
+		Entry: AllowlistChannel{
+			Provider:   provider.ProviderYouTube,
+			ExternalID: testYouTubeChannelID,
+			Title:      "Ada's channel",
+		},
 	})
 	if err != nil {
-		t.Fatalf("replace allowlist: %v", err)
+		t.Fatalf("add allowlist entry: %v", err)
 	}
 	if updated.SyncStatus != SyncSynced || updated.AllowlistVersion != 2 {
 		t.Fatalf("updated = %+v", updated)
 	}
-	if len(updated.Allowlist) != 1 || updated.Allowlist[0].ChannelID != "UC-ada" {
+	if len(updated.Allowlist) != 1 || updated.Allowlist[0].ExternalID != testYouTubeChannelID {
 		t.Fatalf("allowlist = %+v", updated.Allowlist)
 	}
-	_, err = svc.ReplaceChildAllowlist(ctx, created.ID, ReplaceAllowlistRequest{
+	_, err = svc.AddChildAllowlistEntry(ctx, created.ID, AddAllowlistEntryRequest{
 		ExpectedVersion: created.AllowlistVersion,
+		Entry: AllowlistChannel{
+			Provider:   provider.ProviderYouTube,
+			ExternalID: testYouTubeChannelID,
+		},
 	})
 	var ae *apperr.Error
 	if !errors.As(err, &ae) || ae.Code != apperr.CodeConflict {

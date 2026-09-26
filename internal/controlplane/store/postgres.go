@@ -5,11 +5,13 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/behaviorengineering/wonderfeed/internal/apperr"
 	"github.com/behaviorengineering/wonderfeed/internal/controlplane"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -153,10 +155,10 @@ func (s *PostgresStore) ListAllowlist(ctx context.Context, id string) ([]control
 		return nil, err
 	}
 	rows, err := s.pool.Query(ctx, `
-SELECT channel_id, title, url, added_at
+SELECT provider, external_id, title, url, added_at
 FROM wonderfeed.wf_child_allowlist_channels
 WHERE child_profile_id = $1
-ORDER BY added_at ASC, channel_id ASC`, id)
+ORDER BY added_at ASC, provider ASC, external_id ASC`, id)
 	if err != nil {
 		return nil, apperr.Wrap(err, apperr.CodeFailed, op, "query").With("id", id)
 	}
@@ -164,7 +166,7 @@ ORDER BY added_at ASC, channel_id ASC`, id)
 	out := []controlplane.AllowlistChannel{}
 	for rows.Next() {
 		var channel controlplane.AllowlistChannel
-		if err := rows.Scan(&channel.ChannelID, &channel.Title, &channel.URL, &channel.AddedAt); err != nil {
+		if err := rows.Scan(&channel.Provider, &channel.ExternalID, &channel.Title, &channel.URL, &channel.AddedAt); err != nil {
 			return nil, apperr.Wrap(err, apperr.CodeFailed, op, "scan").With("id", id)
 		}
 		out = append(out, channel)
@@ -175,15 +177,39 @@ ORDER BY added_at ASC, channel_id ASC`, id)
 	return out, nil
 }
 
-// ReplaceAllowlist replaces a child's host-owned channels with optimistic locking.
-func (s *PostgresStore) ReplaceAllowlist(ctx context.Context, id string, expectedVersion int64, channels []controlplane.AllowlistChannel) (controlplane.ChildProfile, error) {
-	const op = "store.PostgresStore.ReplaceAllowlist"
+// GetAllowlistEntry returns one host-owned allowlist entry.
+func (s *PostgresStore) GetAllowlistEntry(ctx context.Context, id, providerKey, externalID string) (controlplane.AllowlistChannel, error) {
+	const op = "store.PostgresStore.GetAllowlistEntry"
+	if err := requireCtx(ctx, op); err != nil {
+		return controlplane.AllowlistChannel{}, err
+	}
+	var channel controlplane.AllowlistChannel
+	err := s.pool.QueryRow(ctx, `
+SELECT provider, external_id, title, url, added_at
+FROM wonderfeed.wf_child_allowlist_channels
+WHERE child_profile_id = $1 AND provider = $2 AND external_id = $3`,
+		id, providerKey, externalID,
+	).Scan(&channel.Provider, &channel.ExternalID, &channel.Title, &channel.URL, &channel.AddedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return controlplane.AllowlistChannel{}, apperr.New(apperr.CodeNotFound, op, "allowlist entry not found").
+			With("provider", providerKey).With("external_id", externalID)
+	}
+	if err != nil {
+		return controlplane.AllowlistChannel{}, apperr.Wrap(err, apperr.CodeFailed, op, "query").
+			With("provider", providerKey).With("external_id", externalID)
+	}
+	return channel, nil
+}
+
+// AddAllowlistEntry inserts one allowlist entry with optimistic locking.
+func (s *PostgresStore) AddAllowlistEntry(ctx context.Context, id string, expectedVersion int64, entry controlplane.AllowlistChannel) (controlplane.ChildProfile, error) {
+	const op = "store.PostgresStore.AddAllowlistEntry"
 	if err := requireCtx(ctx, op); err != nil {
 		return controlplane.ChildProfile{}, err
 	}
-	normalized, err := controlplane.NormalizeAllowlist(channels)
+	normalized, err := controlplane.NormalizeAllowlistEntry(entry)
 	if err != nil {
-		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeInvalid, op, "validate allowlist")
+		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeInvalid, op, "validate allowlist entry")
 	}
 	now := s.clock().UTC()
 	tx, err := s.pool.Begin(ctx)
@@ -191,7 +217,92 @@ func (s *PostgresStore) ReplaceAllowlist(ctx context.Context, id string, expecte
 		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeUnavailable, op, "begin")
 	}
 	defer tx.Rollback(ctx)
+	if err := bumpAllowlistVersionTx(ctx, tx, op, id, expectedVersion, now); err != nil {
+		return controlplane.ChildProfile{}, err
+	}
+	tag, err := tx.Exec(ctx, `
+INSERT INTO wonderfeed.wf_child_allowlist_channels (child_profile_id, provider, external_id, title, url, added_at)
+VALUES ($1, $2, $3, $4, $5, $6)`,
+		id, normalized.Provider, normalized.ExternalID, normalized.Title, normalized.URL, now,
+	)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return controlplane.ChildProfile{}, apperr.New(apperr.CodeConflict, op, "allowlist entry already exists").
+				With("provider", normalized.Provider).With("external_id", normalized.ExternalID)
+		}
+		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "insert allowlist entry").With("id", id)
+	}
+	if tag.RowsAffected() == 0 {
+		return controlplane.ChildProfile{}, apperr.New(apperr.CodeFailed, op, "insert allowlist entry").With("id", id)
+	}
+	if err := markAllowlistPendingTx(ctx, tx, op, id, now); err != nil {
+		return controlplane.ChildProfile{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "commit").With("id", id)
+	}
+	return s.Get(ctx, id)
+}
 
+// UpdateAllowlistEntry updates host-owned metadata for one entry.
+func (s *PostgresStore) UpdateAllowlistEntry(ctx context.Context, id, providerKey, externalID string, title, channelURL string) (controlplane.AllowlistChannel, error) {
+	const op = "store.PostgresStore.UpdateAllowlistEntry"
+	if err := requireCtx(ctx, op); err != nil {
+		return controlplane.AllowlistChannel{}, err
+	}
+	tag, err := s.pool.Exec(ctx, `
+UPDATE wonderfeed.wf_child_allowlist_channels
+SET title = $1, url = COALESCE(NULLIF($2, ''), url)
+WHERE child_profile_id = $3 AND provider = $4 AND external_id = $5`,
+		strings.TrimSpace(title), strings.TrimSpace(channelURL), id, providerKey, externalID,
+	)
+	if err != nil {
+		return controlplane.AllowlistChannel{}, apperr.Wrap(err, apperr.CodeFailed, op, "update").With("id", id)
+	}
+	if tag.RowsAffected() == 0 {
+		return controlplane.AllowlistChannel{}, apperr.New(apperr.CodeNotFound, op, "allowlist entry not found").
+			With("provider", providerKey).With("external_id", externalID)
+	}
+	return s.GetAllowlistEntry(ctx, id, providerKey, externalID)
+}
+
+// DeleteAllowlistEntry removes one allowlist entry with optimistic locking.
+func (s *PostgresStore) DeleteAllowlistEntry(ctx context.Context, id string, expectedVersion int64, providerKey, externalID string) (controlplane.ChildProfile, error) {
+	const op = "store.PostgresStore.DeleteAllowlistEntry"
+	if err := requireCtx(ctx, op); err != nil {
+		return controlplane.ChildProfile{}, err
+	}
+	now := s.clock().UTC()
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeUnavailable, op, "begin")
+	}
+	defer tx.Rollback(ctx)
+	if err := bumpAllowlistVersionTx(ctx, tx, op, id, expectedVersion, now); err != nil {
+		return controlplane.ChildProfile{}, err
+	}
+	tag, err := tx.Exec(ctx, `
+DELETE FROM wonderfeed.wf_child_allowlist_channels
+WHERE child_profile_id = $1 AND provider = $2 AND external_id = $3`,
+		id, providerKey, externalID,
+	)
+	if err != nil {
+		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "delete allowlist entry").With("id", id)
+	}
+	if tag.RowsAffected() == 0 {
+		return controlplane.ChildProfile{}, apperr.New(apperr.CodeNotFound, op, "allowlist entry not found").
+			With("provider", providerKey).With("external_id", externalID)
+	}
+	if err := markAllowlistPendingTx(ctx, tx, op, id, now); err != nil {
+		return controlplane.ChildProfile{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "commit").With("id", id)
+	}
+	return s.Get(ctx, id)
+}
+
+func bumpAllowlistVersionTx(ctx context.Context, tx pgx.Tx, op, id string, expectedVersion int64, now time.Time) error {
 	tag, err := tx.Exec(ctx, `
 UPDATE wonderfeed.wf_child_profiles
 SET allowlist_version = allowlist_version + 1, updated_at = $1
@@ -199,42 +310,35 @@ WHERE id = $2 AND allowlist_version = $3`,
 		now, id, expectedVersion,
 	)
 	if err != nil {
-		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "update version").With("id", id)
+		return apperr.Wrap(err, apperr.CodeFailed, op, "update version").With("id", id)
 	}
 	if tag.RowsAffected() == 0 {
 		var exists bool
 		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM wonderfeed.wf_child_profiles WHERE id = $1)`, id).Scan(&exists); err != nil {
-			return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "check exists").With("id", id)
+			return apperr.Wrap(err, apperr.CodeFailed, op, "check exists").With("id", id)
 		}
 		if !exists {
-			return controlplane.ChildProfile{}, apperr.New(apperr.CodeNotFound, op, "child profile not found").With("id", id)
+			return apperr.New(apperr.CodeNotFound, op, "child profile not found").With("id", id)
 		}
-		return controlplane.ChildProfile{}, apperr.New(apperr.CodeConflict, op, "allowlist version conflict").With("id", id)
+		return apperr.New(apperr.CodeConflict, op, "allowlist version conflict").With("id", id)
 	}
-	if _, err := tx.Exec(ctx, `DELETE FROM wonderfeed.wf_child_allowlist_channels WHERE child_profile_id = $1`, id); err != nil {
-		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "clear allowlist").With("id", id)
-	}
-	for _, channel := range normalized {
-		if _, err := tx.Exec(ctx, `
-INSERT INTO wonderfeed.wf_child_allowlist_channels (child_profile_id, channel_id, title, url, added_at)
-VALUES ($1, $2, $3, $4, $5)`,
-			id, channel.ChannelID, channel.Title, channel.URL, now,
-		); err != nil {
-			return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "insert allowlist channel").
-				With("id", id).With("channel_id", channel.ChannelID)
-		}
-	}
+	return nil
+}
+
+func markAllowlistPendingTx(ctx context.Context, tx pgx.Tx, op, id string, now time.Time) error {
 	if _, err := tx.Exec(ctx, `
 INSERT INTO wonderfeed.wf_policy_sync_events (child_profile_id, status, sync_error, created_at)
 VALUES ($1, $2, '', $3)`,
 		id, string(controlplane.SyncPending), now,
 	); err != nil {
-		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "insert sync event").With("id", id)
+		return apperr.Wrap(err, apperr.CodeFailed, op, "insert sync event").With("id", id)
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return controlplane.ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "commit").With("id", id)
-	}
-	return s.Get(ctx, id)
+	return nil
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 // UpdatePolicy applies an optimistic-lock policy update and marks sync_pending.
