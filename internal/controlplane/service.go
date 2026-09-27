@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/behaviorengineering/wonderfeed/internal/apperr"
-	"github.com/behaviorengineering/wonderfeed/internal/provider"
+	"github.com/behaviorengineering/wonderfeed/pkg/provider"
 )
 
 // Service coordinates host desired policy and provider synchronization.

@@ -1,0 +1,17 @@
+# Wonderfeed operator config example (no literal secrets)
+# Install: wonderfeed init
+#
+# Discovery: WONDERFEED_CONFIG -> ~/.config/wonderfeed/config.yaml -> ./config.yaml
+
+database_url: "${DATABASE_URL}"
+parent_auth_key: "${WONDERFEED_PARENT_AUTH_KEY}"
+
+control_plane:
+  bind: "127.0.0.1:8080"
+
+provider:
+  ytzero:
+    base_url: "http://127.0.0.1:3001"
+    auth_method: "none"
+    auth_password: "${YTZERO_AUTH_PASSWORD}"
+    session_cookie: "${YTZERO_SESSION_COOKIE}"

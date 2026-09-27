@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/behaviorengineering/wonderfeed/internal/apperr"
-	"github.com/behaviorengineering/wonderfeed/internal/provider"
+	"github.com/behaviorengineering/wonderfeed/pkg/provider"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )

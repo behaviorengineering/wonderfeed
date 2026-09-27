@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/behaviorengineering/wonderfeed/internal/config"
 	"github.com/behaviorengineering/wonderfeed/internal/controlplane"
 	"github.com/behaviorengineering/wonderfeed/internal/controlplane/store"
 	"github.com/behaviorengineering/wonderfeed/internal/httpapi"
@@ -45,12 +46,19 @@ Commands:
   serve        Start the parent control-plane HTTP API
   migrate up   Apply host control-plane database migrations
 
-Environment:
+Config (first match wins):
+  --config / WONDERFEED_CONFIG  Explicit config.yaml path
+  ~/.config/wonderfeed/config.yaml
+  ./config.yaml
+
+Run wonderfeed init to create the user config. Secrets resolve from the environment
+first, then the platform credential store (Keychain / Windows Credential Manager).
+
+Environment (fallback when no config file):
   WONDERFEED_CONTROL_BIND     Listen address (default 127.0.0.1:8080)
   DATABASE_URL                PostgreSQL DSN (required)
   YTZERO_BASE_URL             Provider base URL (default http://127.0.0.1:3001)
   YTZERO_SESSION_COOKIE       Optional Cookie header for provider policy HTTP auth
-  DATABASE_URL                Same PostgreSQL as YT Zero (required; also used for allowlist DB sync)
   WONDERFEED_PARENT_AUTH_KEY  Required for non-loopback binds
 
 `)
@@ -173,7 +181,10 @@ Starts the parent control-plane HTTP API. Binds to WONDERFEED_CONTROL_BIND
 }
 
 func loadControlConfig() controlplane.Config {
-	cfg := controlplane.LoadConfigFromEnv()
+	cfg, err := config.LoadControlPlaneConfig("")
+	if err != nil {
+		cfg = controlplane.LoadConfigFromEnv()
+	}
 	if cfg.DatabaseURL == "" {
 		if pw := strings.TrimSpace(os.Getenv("POSTGRES_PASSWORD")); pw != "" {
 			user := envOrDefault("POSTGRES_USER", "ytzero")

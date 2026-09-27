@@ -27,6 +27,7 @@ Shared pack skills (golang-quality, process-compose-docker, and so on) live unde
 ```bash
 git submodule update --init --recursive
 make build
+make init                 # ~/.config/wonderfeed/config.yaml (${VAR} + OS credential store)
 make provider-up          # or: make serve
 make provider-health      # expect "database": "postgres"
 ```

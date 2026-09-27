@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/behaviorengineering/wonderfeed/internal/controlplane"
-	"github.com/behaviorengineering/wonderfeed/internal/provider"
+	"github.com/behaviorengineering/wonderfeed/pkg/provider"
 )
 
 type okProvider struct{}

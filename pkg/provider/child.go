@@ -1,4 +1,4 @@
-// Package provider defines provider-neutral seams for Wonderfeed adapters.
+// Package provider defines provider-neutral seams for Wonderfeed media adapters.
 package provider
 
 import "context"

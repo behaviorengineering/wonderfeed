@@ -4,7 +4,7 @@ GO ?= go
 BIN_DIR := bin
 BINARY := $(BIN_DIR)/wonderfeed
 
-.PHONY: help build test vet tidy format serve serve-down provider-image provider-status provider-health provider-up provider-down backup-create backup-list youtube-api-terms-refresh
+.PHONY: help build init test vet tidy format serve serve-down provider-image provider-status provider-health provider-up provider-down backup-create backup-list youtube-api-terms-refresh
 
 help: ## List available make verbs
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) | \
@@ -13,6 +13,9 @@ help: ## List available make verbs
 build: ## Build wonderfeed into bin/
 	@mkdir -p $(BIN_DIR)
 	$(GO) build -o $(BINARY) ./cmd/wonderfeed
+
+init: build ## Create user config under XDG (~/.config/wonderfeed)
+	$(BINARY) init
 
 test: ## Run unit tests
 	$(GO) test ./...

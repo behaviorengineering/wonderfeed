@@ -57,6 +57,9 @@ make serve-down
 ```text
 wonderfeed version
 wonderfeed help
+wonderfeed init [--force]
+wonderfeed control migrate up
+wonderfeed control serve
 wonderfeed provider status
 wonderfeed provider prepare
 wonderfeed provider up
@@ -96,9 +99,23 @@ Optional S3-compatible upload (R2/B2/MinIO) uses `WONDERFEED_BACKUP_S3_*` in `.e
 3. Override images with `YTZERO_IMAGE` / `POSTGRES_IMAGE` when needed.
 4. Child profiles and feed policy stay in the YT Zero UI; record product gaps in `docs/roadmap.md`.
 
+## Operator config and control plane
+
+Run `wonderfeed init` (or `make init`) to create `~/.config/wonderfeed/config.yaml`
+(mode `0600`). Use `${DATABASE_URL}` and other `${VAR}` placeholders only; set secrets
+in the environment or the platform credential store (macOS Keychain / Windows Credential
+Manager). Override path with `WONDERFEED_CONFIG` or `--config`. See [config.yaml.example](../config.yaml.example).
+
+Apply host migrations before serve:
+
+```bash
+bin/wonderfeed control migrate up
+bin/wonderfeed control serve
+```
+
 ## Control plane allowlist sync
 
-When running `wonderfeed control serve`, set `DATABASE_URL` to the same
+When running `wonderfeed control serve`, point `database_url` / `DATABASE_URL` at the same
 PostgreSQL database YT Zero uses (`postgresql://...@127.0.0.1:5432/ytzero`).
 The control plane persists provider-scoped allowlist CRUD in `wonderfeed.*`
 tables, then writes YT Zero `channels` / `user_channels` rows directly
