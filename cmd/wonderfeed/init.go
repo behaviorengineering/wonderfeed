@@ -15,8 +15,8 @@ func runInit(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprint(stdout, `Usage: wonderfeed init [--force]
 
 Creates ~/.config/wonderfeed/config.yaml when missing (mode 0600) and refreshes
-config.yaml.example under the same directory. Secrets stay in the environment or
-the platform credential store; YAML uses ${VAR} placeholders only.
+config.yaml.example. Lists secrets in YAML for env, OS credential store, or
+optional secrets.enc.yaml (SOPS). Field values use ${VAR} placeholders only.
 
 `)
 			return 0

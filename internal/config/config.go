@@ -2,14 +2,15 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/behaviorengineering/operatorconfig/pkg/operatorconfig"
 	"github.com/behaviorengineering/wonderfeed/internal/apperr"
 	"github.com/behaviorengineering/wonderfeed/internal/config/template"
 	"github.com/behaviorengineering/wonderfeed/internal/controlplane"
-	"github.com/behaviorengineering/wonderfeed/internal/secret"
 )
 
 // InitOptions controls wonderfeed init behavior.
@@ -26,47 +27,33 @@ type InitResult struct {
 
 // InitUserConfigFiles writes config.yaml and config.yaml.example under the user config directory.
 func InitUserConfigFiles(opts InitOptions) (*InitResult, error) {
-	dir, err := UserConfigDir()
+	op := DefaultOptions("")
+	written, err := operatorconfig.InitUserConfig(op, template.ConfigYAML, opts.Force)
 	if err != nil {
-		return nil, apperr.Wrap(err, apperr.CodeUnavailable, "config.Init", "resolve user config directory")
+		return nil, wrapConfigErr(err, "config.Init", "initialize user config")
 	}
-	configPath, err := UserConfigFilePath()
+	cfgPath, err := UserConfigFilePath()
 	if err != nil {
 		return nil, apperr.Wrap(err, apperr.CodeUnavailable, "config.Init", "resolve user config file")
 	}
-	examplePath, err := UserConfigExampleFilePath()
-	if err != nil {
-		return nil, apperr.Wrap(err, apperr.CodeUnavailable, "config.Init", "resolve user config example")
-	}
-
-	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return nil, apperr.Wrap(err, apperr.CodeUnavailable, "config.Init", "create user config directory").With("path", dir)
-	}
-
-	result := &InitResult{ConfigDir: dir}
-
-	if err := os.WriteFile(examplePath, template.ConfigExampleYAML, 0o600); err != nil {
-		return nil, apperr.Wrap(err, apperr.CodeUnavailable, "config.Init", "write config example").With("path", examplePath)
-	}
+	result := &InitResult{ConfigDir: filepath.Dir(cfgPath)}
+	examplePath := cfgPath + ".example"
 	result.Created = append(result.Created, examplePath)
-
-	if _, err := os.Stat(configPath); err == nil && !opts.Force {
-		result.Skipped = append(result.Skipped, configPath)
-		return result, nil
+	if written {
+		result.Created = append(result.Created, cfgPath)
+	} else {
+		result.Skipped = append(result.Skipped, cfgPath)
 	}
-	if err := os.WriteFile(configPath, template.ConfigYAML, 0o600); err != nil {
-		return nil, apperr.Wrap(err, apperr.CodeUnavailable, "config.Init", "write config").With("path", configPath)
-	}
-	result.Created = append(result.Created, configPath)
 	return result, nil
 }
 
 // FileConfig is the on-disk operator YAML schema.
 type FileConfig struct {
-	DatabaseURL   string              `yaml:"database_url"`
-	ParentAuthKey string              `yaml:"parent_auth_key"`
-	ControlPlane  ControlPlaneSection `yaml:"control_plane"`
-	Provider      ProviderSection     `yaml:"provider"`
+	Secrets       []operatorconfig.Secret `yaml:"secrets"`
+	DatabaseURL   string                  `yaml:"database_url"`
+	ParentAuthKey string                  `yaml:"parent_auth_key"`
+	ControlPlane  ControlPlaneSection     `yaml:"control_plane"`
+	Provider      ProviderSection           `yaml:"provider"`
 }
 
 // ControlPlaneSection holds HTTP API settings.
@@ -87,11 +74,23 @@ type YTZeroSection struct {
 	SessionCookie string `yaml:"session_cookie"`
 }
 
-// Load reads operator config from override, env, user path, then cwd config.yaml.
-func Load(override string) (*FileConfig, string, error) {
-	path, err := resolveConfigPath(override)
+// Load reads operator config using DefaultOptions and the default keyring.
+func Load(configFlagPath string) (*FileConfig, string, error) {
+	return LoadWith(configFlagPath, nil)
+}
+
+// LoadWith reads operator config with an injectable keyring (tests).
+func LoadWith(configFlagPath string, kr operatorconfig.Keyring) (*FileConfig, string, error) {
+	opts := DefaultOptions(configFlagPath)
+	if kr != nil {
+		opts.Keyring = kr
+	}
+	path, err := operatorconfig.ResolveConfigPath(opts)
 	if err != nil {
-		return nil, "", err
+		return nil, "", wrapConfigErr(err, "config.Load", "resolve config path")
+	}
+	if path == "" {
+		return nil, "", apperr.New(apperr.CodeNotFound, "config.Load", "config.yaml not found (run: wonderfeed init)")
 	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
@@ -101,19 +100,21 @@ func Load(override string) (*FileConfig, string, error) {
 	if err := yaml.Unmarshal(raw, cfg); err != nil {
 		return nil, "", apperr.Wrap(err, apperr.CodeInvalid, "config.Load", "parse config").With("path", path)
 	}
+	resolveOpts := opts
+	resolveOpts.Secrets = cfg.Secrets
+	if len(resolveOpts.Secrets) > 0 {
+		if err := operatorconfig.ResolveSecrets(resolveOpts, nil); err != nil {
+			return nil, "", wrapConfigErr(err, "config.Load", "resolve secrets")
+		}
+	}
+	expandFileConfigPlaceholders(cfg)
 	applyDefaults(cfg)
-	if err := expandConfigPlaceholders(cfg); err != nil {
-		return nil, "", err
-	}
-	if err := resolveFileSecrets(cfg); err != nil {
-		return nil, "", err
-	}
 	return cfg, path, nil
 }
 
 // LoadControlPlaneConfig loads YAML when present, otherwise environment defaults.
-func LoadControlPlaneConfig(override string) (controlplane.Config, error) {
-	cfg, _, err := Load(override)
+func LoadControlPlaneConfig(configFlagPath string) (controlplane.Config, error) {
+	cfg, _, err := Load(configFlagPath)
 	if err != nil {
 		if isConfigNotFound(err) {
 			return controlplane.LoadConfigFromEnv(), nil
@@ -147,30 +148,6 @@ func (f *FileConfig) ToControlPlaneConfig() controlplane.Config {
 	}
 }
 
-func resolveConfigPath(override string) (string, error) {
-	if p := strings.TrimSpace(override); p != "" {
-		if _, err := os.Stat(p); err != nil {
-			return "", apperr.Wrap(err, apperr.CodeNotFound, "config.resolvePath", "config override missing").With("path", p)
-		}
-		return p, nil
-	}
-	if env := strings.TrimSpace(os.Getenv(EnvConfig)); env != "" {
-		if _, err := os.Stat(env); err != nil {
-			return "", apperr.Wrap(err, apperr.CodeNotFound, "config.resolvePath", "WONDERFEED_CONFIG path missing").With("path", env)
-		}
-		return env, nil
-	}
-	if userPath, err := UserConfigFilePath(); err == nil {
-		if _, err := os.Stat(userPath); err == nil {
-			return userPath, nil
-		}
-	}
-	if _, err := os.Stat("config.yaml"); err == nil {
-		return "config.yaml", nil
-	}
-	return "", apperr.New(apperr.CodeNotFound, "config.resolvePath", "config.yaml not found (run: wonderfeed init)")
-}
-
 func applyDefaults(cfg *FileConfig) {
 	if strings.TrimSpace(cfg.ControlPlane.Bind) == "" {
 		cfg.ControlPlane.Bind = controlplane.DefaultBind
@@ -183,55 +160,18 @@ func applyDefaults(cfg *FileConfig) {
 	}
 }
 
-func resolveFileSecrets(cfg *FileConfig) error {
-	if strings.TrimSpace(cfg.DatabaseURL) == "" {
-		if v, err := secret.Resolve("DATABASE_URL"); err == nil {
-			cfg.DatabaseURL = v
-		} else if !secret.IsNotFound(err) {
-			return apperr.Wrap(err, apperr.CodeUnavailable, "config.resolveSecrets", "resolve DATABASE_URL")
-		}
+func wrapConfigErr(err error, op, message string) error {
+	if err == nil {
+		return nil
 	}
-	if strings.TrimSpace(cfg.ParentAuthKey) == "" {
-		if v, err := secret.Resolve("WONDERFEED_PARENT_AUTH_KEY"); err == nil {
-			cfg.ParentAuthKey = v
-		} else if !secret.IsNotFound(err) {
-			return apperr.Wrap(err, apperr.CodeUnavailable, "config.resolveSecrets", "resolve WONDERFEED_PARENT_AUTH_KEY")
-		}
+	msg := err.Error()
+	if strings.Contains(msg, "not found") {
+		return apperr.Wrap(err, apperr.CodeNotFound, op, message)
 	}
-	if strings.TrimSpace(cfg.Provider.YTZero.SessionCookie) == "" {
-		if v, err := secret.Resolve("YTZERO_SESSION_COOKIE"); err == nil {
-			cfg.Provider.YTZero.SessionCookie = v
-		} else if !secret.IsNotFound(err) {
-			return apperr.Wrap(err, apperr.CodeUnavailable, "config.resolveSecrets", "resolve YTZERO_SESSION_COOKIE")
-		}
-	}
-	if strings.TrimSpace(cfg.Provider.YTZero.AuthPassword) == "" {
-		if v, err := secret.Resolve("YTZERO_AUTH_PASSWORD"); err == nil {
-			cfg.Provider.YTZero.AuthPassword = v
-		} else if !secret.IsNotFound(err) {
-			return apperr.Wrap(err, apperr.CodeUnavailable, "config.resolveSecrets", "resolve YTZERO_AUTH_PASSWORD")
-		}
-	}
-	return nil
+	return apperr.Wrap(err, apperr.CodeInvalid, op, message)
 }
 
 func isConfigNotFound(err error) bool {
-	var ae *apperr.Error
-	if err == nil {
-		return false
-	}
-	// apperr.Wrap preserves code in Error type
-	if apperrAs(err, &ae) {
-		return ae.Code == apperr.CodeNotFound
-	}
-	return false
-}
-
-func apperrAs(err error, target **apperr.Error) bool {
 	ae, ok := err.(*apperr.Error)
-	if !ok {
-		return false
-	}
-	*target = ae
-	return true
+	return ok && ae.Code == apperr.CodeNotFound
 }

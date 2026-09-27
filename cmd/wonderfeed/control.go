@@ -51,8 +51,9 @@ Config (first match wins):
   ~/.config/wonderfeed/config.yaml
   ./config.yaml
 
-Run wonderfeed init to create the user config. Secrets resolve from the environment
-first, then the platform credential store (Keychain / Windows Credential Manager).
+Run wonderfeed init to create the user config. Secrets resolve from the environment,
+then the platform credential store (Keychain / Windows Credential Manager), then
+optional ~/.config/wonderfeed/secrets.enc.yaml (SOPS).
 
 Environment (fallback when no config file):
   WONDERFEED_CONTROL_BIND     Listen address (default 127.0.0.1:8080)
@@ -65,11 +66,12 @@ Environment (fallback when no config file):
 }
 
 func runControlMigrate(args []string, stdout, stderr io.Writer) int {
+	args, configPath := parseControlConfigFlag(args)
 	if len(args) < 1 || args[0] != "up" {
-		fmt.Fprintln(stderr, "usage: wonderfeed control migrate up")
+		fmt.Fprintln(stderr, "usage: wonderfeed control migrate up [--config path]")
 		return 2
 	}
-	cfg := loadControlConfig()
+	cfg := loadControlConfig(configPath)
 	if strings.TrimSpace(cfg.DatabaseURL) == "" {
 		fmt.Fprintln(stderr, "control migrate: DATABASE_URL is required")
 		return 2
@@ -91,6 +93,7 @@ func runControlMigrate(args []string, stdout, stderr io.Writer) int {
 }
 
 func runControlServe(args []string, stdout, stderr io.Writer) int {
+	args, configPath := parseControlConfigFlag(args)
 	for _, a := range args {
 		if a == "-h" || a == "--help" || a == "help" {
 			fmt.Fprint(stdout, `Usage: wonderfeed control serve
@@ -103,7 +106,7 @@ Starts the parent control-plane HTTP API. Binds to WONDERFEED_CONTROL_BIND
 		}
 	}
 
-	cfg := loadControlConfig()
+	cfg := loadControlConfig(configPath)
 	if err := cfg.Validate(); err != nil {
 		fmt.Fprintf(stderr, "control serve: %v\n", err)
 		return 2
@@ -180,8 +183,8 @@ Starts the parent control-plane HTTP API. Binds to WONDERFEED_CONTROL_BIND
 	}
 }
 
-func loadControlConfig() controlplane.Config {
-	cfg, err := config.LoadControlPlaneConfig("")
+func loadControlConfig(configFlagPath string) controlplane.Config {
+	cfg, err := config.LoadControlPlaneConfig(configFlagPath)
 	if err != nil {
 		cfg = controlplane.LoadConfigFromEnv()
 	}

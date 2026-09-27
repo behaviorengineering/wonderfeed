@@ -102,15 +102,20 @@ Optional S3-compatible upload (R2/B2/MinIO) uses `WONDERFEED_BACKUP_S3_*` in `.e
 ## Operator config and control plane
 
 Run `wonderfeed init` (or `make init`) to create `~/.config/wonderfeed/config.yaml`
-(mode `0600`). Use `${DATABASE_URL}` and other `${VAR}` placeholders only; set secrets
-in the environment or the platform credential store (macOS Keychain / Windows Credential
-Manager). Override path with `WONDERFEED_CONFIG` or `--config`. See [config.yaml.example](../config.yaml.example).
+(mode `0600`). Config discovery uses [operatorconfig](https://github.com/behaviorengineering/operatorconfig)
+(`WONDERFEED_CONFIG` or `--config`, then `~/.config/wonderfeed/config.yaml`, then `./config.yaml`).
+
+The `secrets:` list in config names env vars resolved in order: process environment,
+OS credential store (Keychain / Windows Credential Manager), then optional
+`~/.config/wonderfeed/secrets.enc.yaml` (SOPS). Field values use `${VAR}` placeholders only.
+Docker and CI should inject secrets via the environment on the host (no keyring inside containers).
+See [config.yaml.example](../config.yaml.example).
 
 Apply host migrations before serve:
 
 ```bash
-bin/wonderfeed control migrate up
-bin/wonderfeed control serve
+bin/wonderfeed control migrate up [--config path]
+bin/wonderfeed control serve [--config path]
 ```
 
 ## Control plane allowlist sync

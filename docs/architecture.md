@@ -47,6 +47,7 @@ flowchart TD
 | --- | --- | --- |
 | Product principles, roadmap, parent UX intent | Wonderfeed host | Docs and host skills under this repo |
 | Local provider run (compose, process-compose, env, health) | Wonderfeed host | `deploy/ytzero/`, `data/postgres/`, `data/ytzero/`, `cmd/wonderfeed` |
+| Operator YAML config and secret resolution | Wonderfeed host + [operatorconfig](https://github.com/behaviorengineering/operatorconfig) | `internal/config`; `wonderfeed init` |
 | Parent child-policy and allowlist control plane | Wonderfeed host | `wonderfeed control serve`; schema `wonderfeed.*`; adapter under `internal/provider/ytzero` |
 | Subscription inbox, tags, rules, profiles | YT Zero provider | Source at `providers/ytzero`; DB in host Postgres; files under `data/ytzero` |
 | Remote HTTPS to homes (school/product) | Wonderfeed + Cloudflare | Design in [cloudflare.md](cloudflare.md); not local serve |
