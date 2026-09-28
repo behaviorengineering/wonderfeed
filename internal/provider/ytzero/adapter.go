@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/behaviorengineering/wonderfeed/internal/apperr"
-	"github.com/behaviorengineering/wonderfeed/internal/provider"
+	"github.com/behaviorengineering/wonderfeed/pkg/provider"
 )
 
 // Adapter implements provider.ChildProfileProvider against YT Zero HTTP APIs.

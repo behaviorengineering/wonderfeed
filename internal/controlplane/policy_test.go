@@ -54,6 +54,20 @@ func TestValidateCreateName(t *testing.T) {
 	}
 }
 
+func TestNormalizeAllowlistEntryNetflixProvider(t *testing.T) {
+	t.Parallel()
+	entry, err := NormalizeAllowlistEntry(AllowlistChannel{
+		Provider:   "netflix",
+		ExternalID: "title-abc123",
+	})
+	if err != nil {
+		t.Fatalf("netflix entry: %v", err)
+	}
+	if entry.Provider != "netflix" || entry.ExternalID != "title-abc123" {
+		t.Fatalf("got %+v", entry)
+	}
+}
+
 func TestDefaultChildPolicyFailClosed(t *testing.T) {
 	t.Parallel()
 	p := DefaultChildPolicy()

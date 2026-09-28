@@ -107,6 +107,17 @@ func apperrAsTransient(err error, target **transientHTTPError) bool {
 
 // DoJSON performs method path with optional JSON body and returns response bytes.
 func (c *ResilientClient) DoJSON(ctx context.Context, method, path string, body any) ([]byte, int, error) {
+	return c.doJSON(ctx, method, path, body, c.SessionCookie)
+}
+
+// DoJSONForProfile performs a request using the selected YT Zero profile.
+// This works with YT Zero's legacy/shared profile selection cookie while
+// preserving the configured authentication session.
+func (c *ResilientClient) DoJSONForProfile(ctx context.Context, profileID, method, path string, body any) ([]byte, int, error) {
+	return c.doJSON(ctx, method, path, body, profileCookie(c.SessionCookie, profileID))
+}
+
+func (c *ResilientClient) doJSON(ctx context.Context, method, path string, body any, sessionCookie string) ([]byte, int, error) {
 	const op = "ytzero.ResilientClient.DoJSON"
 	if c == nil {
 		return nil, 0, apperr.New(apperr.CodeInvalid, op, "client is nil")
@@ -121,7 +132,7 @@ func (c *ResilientClient) DoJSON(ctx context.Context, method, path string, body 
 	raw, err := failsafe.With(c.breaker, c.retry).
 		WithContext(ctx).
 		Get(func() ([]byte, error) {
-			return c.doOnce(ctx, method, url, body)
+			return c.doOnce(ctx, method, url, body, sessionCookie)
 		})
 	if err != nil {
 		var perm *permanentHTTPError
@@ -149,7 +160,7 @@ func asPermanent(err error, target **permanentHTTPError) bool {
 	return false
 }
 
-func (c *ResilientClient) doOnce(ctx context.Context, method, url string, body any) ([]byte, error) {
+func (c *ResilientClient) doOnce(ctx context.Context, method, url string, body any, sessionCookie string) ([]byte, error) {
 	var reader io.Reader
 	if body != nil {
 		payload, err := json.Marshal(body)
@@ -165,8 +176,8 @@ func (c *ResilientClient) doOnce(ctx context.Context, method, url string, body a
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	if c.SessionCookie != "" {
-		req.Header.Set("Cookie", c.SessionCookie)
+	if sessionCookie != "" {
+		req.Header.Set("Cookie", sessionCookie)
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
@@ -184,4 +195,15 @@ func (c *ResilientClient) doOnce(ctx context.Context, method, url string, body a
 		return nil, &transientHTTPError{status: resp.StatusCode, body: string(raw)}
 	}
 	return nil, &permanentHTTPError{status: resp.StatusCode, body: string(raw)}
+}
+
+func profileCookie(sessionCookie, profileID string) string {
+	profileID = strings.TrimSpace(profileID)
+	if profileID == "" {
+		return sessionCookie
+	}
+	if sessionCookie == "" {
+		return "ytzero_profile=" + profileID
+	}
+	return sessionCookie + "; ytzero_profile=" + profileID
 }

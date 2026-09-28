@@ -1,0 +1,24 @@
+# Wonderfeed operator config example (no literal secrets)
+# Install: wonderfeed init
+#
+# Discovery: --config / WONDERFEED_CONFIG -> ~/.config/wonderfeed/config.yaml -> ./config.yaml
+# Secrets: process env, then OS credential store, then optional secrets.enc.yaml (SOPS).
+
+secrets:
+  - DATABASE_URL
+  - WONDERFEED_PARENT_AUTH_KEY
+  - YTZERO_AUTH_PASSWORD
+  - YTZERO_SESSION_COOKIE
+
+database_url: "${DATABASE_URL}"
+parent_auth_key: "${WONDERFEED_PARENT_AUTH_KEY}"
+
+control_plane:
+  bind: "127.0.0.1:8080"
+
+provider:
+  ytzero:
+    base_url: "http://127.0.0.1:3001"
+    auth_method: "none"
+    auth_password: "${YTZERO_AUTH_PASSWORD}"
+    session_cookie: "${YTZERO_SESSION_COOKIE}"

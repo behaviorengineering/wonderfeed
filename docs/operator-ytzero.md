@@ -57,6 +57,9 @@ make serve-down
 ```text
 wonderfeed version
 wonderfeed help
+wonderfeed init [--force]
+wonderfeed control migrate up
+wonderfeed control serve
 wonderfeed provider status
 wonderfeed provider prepare
 wonderfeed provider up
@@ -95,6 +98,37 @@ Optional S3-compatible upload (R2/B2/MinIO) uses `WONDERFEED_BACKUP_S3_*` in `.e
 2. Required: `POSTGRES_PASSWORD` (avoid `@ : / ? #` so `DATABASE_URL` stays valid).
 3. Override images with `YTZERO_IMAGE` / `POSTGRES_IMAGE` when needed.
 4. Child profiles and feed policy stay in the YT Zero UI; record product gaps in `docs/roadmap.md`.
+
+## Operator config and control plane
+
+Run `wonderfeed init` (or `make init`) to create `~/.config/wonderfeed/config.yaml`
+(mode `0600`). Config discovery uses [operatorconfig](https://github.com/behaviorengineering/operatorconfig)
+(`WONDERFEED_CONFIG` or `--config`, then `~/.config/wonderfeed/config.yaml`, then `./config.yaml`).
+
+The `secrets:` list in config names env vars resolved in order: process environment,
+OS credential store (Keychain / Windows Credential Manager), then optional
+`~/.config/wonderfeed/secrets.enc.yaml` (SOPS). Field values use `${VAR}` placeholders only.
+Docker and CI should inject secrets via the environment on the host (no keyring inside containers).
+See [config.yaml.example](../config.yaml.example).
+
+Apply host migrations before serve:
+
+```bash
+bin/wonderfeed control migrate up [--config path]
+bin/wonderfeed control serve [--config path]
+```
+
+## Control plane allowlist sync
+
+When running `wonderfeed control serve`, point `database_url` / `DATABASE_URL` at the same
+PostgreSQL database YT Zero uses (`postgresql://...@127.0.0.1:5432/ytzero`).
+The control plane persists provider-scoped allowlist CRUD in `wonderfeed.*`
+tables, then writes YT Zero `channels` / `user_channels` rows directly
+(experimental; couples to the provider schema in that database).
+
+Policy patches still use the HTTP adapter. Set `YTZERO_SESSION_COOKIE` only when
+YT Zero auth requires an admin session for `PATCH /api/profiles/{id}`.
+Allowlist membership does not use provider HTTP routes or child-profile cookies.
 
 ## Switching from SQLite
 

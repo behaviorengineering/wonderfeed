@@ -39,6 +39,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runBackup(args[2:], stdout, stderr)
 	case "control":
 		return runControl(args[2:], stdout, stderr)
+	case "init":
+		return runInit(args[2:], stdout, stderr)
 	default:
 		fmt.Fprintf(stderr, "unknown command: %s\n\n", args[1])
 		printUsage(stderr)
@@ -61,6 +63,7 @@ Commands:
   backup create        Encrypted Postgres + portable state backup
   backup list          List local (and optional S3) backups
   backup restore <id>  Restore a backup (requires --confirm)
+  init                 Create user config under ~/.config/wonderfeed/
   control serve        Start parent control-plane HTTP API
   control migrate up   Apply host control-plane database migrations
 

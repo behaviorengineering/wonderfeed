@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/behaviorengineering/wonderfeed/internal/config"
 	"github.com/behaviorengineering/wonderfeed/internal/controlplane"
 	"github.com/behaviorengineering/wonderfeed/internal/controlplane/store"
 	"github.com/behaviorengineering/wonderfeed/internal/httpapi"
@@ -45,22 +46,32 @@ Commands:
   serve        Start the parent control-plane HTTP API
   migrate up   Apply host control-plane database migrations
 
-Environment:
+Config (first match wins):
+  --config / WONDERFEED_CONFIG  Explicit config.yaml path
+  ~/.config/wonderfeed/config.yaml
+  ./config.yaml
+
+Run wonderfeed init to create the user config. Secrets resolve from the environment,
+then the platform credential store (Keychain / Windows Credential Manager), then
+optional ~/.config/wonderfeed/secrets.enc.yaml (SOPS).
+
+Environment (fallback when no config file):
   WONDERFEED_CONTROL_BIND     Listen address (default 127.0.0.1:8080)
   DATABASE_URL                PostgreSQL DSN (required)
   YTZERO_BASE_URL             Provider base URL (default http://127.0.0.1:3001)
-  YTZERO_SESSION_COOKIE       Optional Cookie header for provider API auth
+  YTZERO_SESSION_COOKIE       Optional Cookie header for provider policy HTTP auth
   WONDERFEED_PARENT_AUTH_KEY  Required for non-loopback binds
 
 `)
 }
 
 func runControlMigrate(args []string, stdout, stderr io.Writer) int {
+	args, configPath := parseControlConfigFlag(args)
 	if len(args) < 1 || args[0] != "up" {
-		fmt.Fprintln(stderr, "usage: wonderfeed control migrate up")
+		fmt.Fprintln(stderr, "usage: wonderfeed control migrate up [--config path]")
 		return 2
 	}
-	cfg := loadControlConfig()
+	cfg := loadControlConfig(configPath)
 	if strings.TrimSpace(cfg.DatabaseURL) == "" {
 		fmt.Fprintln(stderr, "control migrate: DATABASE_URL is required")
 		return 2
@@ -82,6 +93,7 @@ func runControlMigrate(args []string, stdout, stderr io.Writer) int {
 }
 
 func runControlServe(args []string, stdout, stderr io.Writer) int {
+	args, configPath := parseControlConfigFlag(args)
 	for _, a := range args {
 		if a == "-h" || a == "--help" || a == "help" {
 			fmt.Fprint(stdout, `Usage: wonderfeed control serve
@@ -94,7 +106,7 @@ Starts the parent control-plane HTTP API. Binds to WONDERFEED_CONTROL_BIND
 		}
 	}
 
-	cfg := loadControlConfig()
+	cfg := loadControlConfig(configPath)
 	if err := cfg.Validate(); err != nil {
 		fmt.Fprintf(stderr, "control serve: %v\n", err)
 		return 2
@@ -122,11 +134,13 @@ Starts the parent control-plane HTTP API. Binds to WONDERFEED_CONTROL_BIND
 		SessionCookie: cfg.ProviderSessionCookie,
 		HTTP:          http.DefaultClient,
 	})
+	allowlistSync := ytzero.NewPgAllowlistSync(pool)
 	svc := controlplane.NewService(controlplane.ServiceConfig{
-		Store:    st,
-		Provider: adapter,
-		Clock:    time.Now,
-		Logger:   logger,
+		Store:         st,
+		Provider:      adapter,
+		AllowlistSync: allowlistSync,
+		Clock:         time.Now,
+		Logger:        logger,
 	})
 	handler := httpapi.NewHandler(httpapi.HandlerConfig{
 		Service:       svc,
@@ -169,8 +183,11 @@ Starts the parent control-plane HTTP API. Binds to WONDERFEED_CONTROL_BIND
 	}
 }
 
-func loadControlConfig() controlplane.Config {
-	cfg := controlplane.LoadConfigFromEnv()
+func loadControlConfig(configFlagPath string) controlplane.Config {
+	cfg, err := config.LoadControlPlaneConfig(configFlagPath)
+	if err != nil {
+		cfg = controlplane.LoadConfigFromEnv()
+	}
 	if cfg.DatabaseURL == "" {
 		if pw := strings.TrimSpace(os.Getenv("POSTGRES_PASSWORD")); pw != "" {
 			user := envOrDefault("POSTGRES_USER", "ytzero")
