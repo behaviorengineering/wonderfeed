@@ -1,0 +1,23 @@
+---
+description: >-
+  Wonderfeed control-plane API provider-scope honesty. Load wonderfeed-provider-integration
+  when editing or reviewing pkg/provider, pkg/controlplane, internal/httpapi,
+  internal/controlplane, or internal/provider host adapters.
+globs: "pkg/provider/**,pkg/controlplane/**,internal/httpapi/**,internal/controlplane/**,internal/provider/**"
+---
+
+# Wonderfeed API provider scope
+
+Host overlay (not cursor-packs). Product-specific API naming rules live here and in the host skill.
+
+## Generation
+
+**CONSTRAINT:** When creating or changing files matched by this rule, MUST Read and follow `.cursor/skills/wonderfeed-provider-integration/SKILL.md`, especially the API provider-scope CONSTRAINT.
+
+## Staged review (check code)
+
+When the user asks to review, audit, rate quality, check code, or check production readiness for Go changes that touch paths matched by this rule:
+
+- MUST load `.cursor/skills/review-code-staged/SKILL.md` and run Stage 5 (Generation Gates) as usual.
+- MUST also score the **API provider scope** pre-completion checklist from `wonderfeed-provider-integration` for those diffs (same pattern as Stage 5 loading `cli-command-surface` when a CLI entrypoint is in scope).
+- MUST NOT edit pack-linked `review-code-staged` to embed Wonderfeed-only checklist text; this host rule owns that gate.

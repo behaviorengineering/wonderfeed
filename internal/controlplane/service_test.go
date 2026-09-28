@@ -63,8 +63,15 @@ func (f *fakeProvider) ApplyPolicy(ctx context.Context, providerProfileID string
 	return provider.ApplyResult{ProviderProfileID: providerProfileID}, nil
 }
 
+func (f *fakeProvider) ApplyYouTubeFollowOwnership(ctx context.Context, providerProfileID string) error {
+	return nil
+}
+
 type fakeAllowlistSync struct {
-	fail bool
+	fail            bool
+	reconcileCalls  int
+	lastReconcileID string
+	lastChannels    []provider.ScopedChannel
 }
 
 func (f *fakeAllowlistSync) AddMembership(ctx context.Context, providerProfileID string, channel provider.ScopedChannel) error {
@@ -82,6 +89,9 @@ func (f *fakeAllowlistSync) RemoveMembership(ctx context.Context, providerProfil
 }
 
 func (f *fakeAllowlistSync) ReconcileAll(ctx context.Context, providerProfileID string, channels []provider.ScopedChannel) error {
+	f.reconcileCalls++
+	f.lastReconcileID = providerProfileID
+	f.lastChannels = channels
 	if f.fail {
 		return apperr.New(apperr.CodeUnavailable, "fake.ReconcileAll", "provider down")
 	}
@@ -176,9 +186,17 @@ func TestServiceUpdateConflict(t *testing.T) {
 	}
 }
 
-func TestServiceAddAllowlistEntry(t *testing.T) {
+func TestServiceAddAllowlistEntryReconcilesFullAllowlist(t *testing.T) {
 	t.Parallel()
-	svc := testService(t, newFakeProvider())
+	sync := &fakeAllowlistSync{}
+	now := time.Date(2026, 9, 25, 2, 0, 0, 0, time.UTC)
+	svc := NewService(ServiceConfig{
+		Store:         NewMemoryStore(func() time.Time { return now }),
+		Provider:      newFakeProvider(),
+		AllowlistSync: sync,
+		Clock:         func() time.Time { return now },
+		Logger:        slog.Default(),
+	})
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -202,6 +220,12 @@ func TestServiceAddAllowlistEntry(t *testing.T) {
 	}
 	if len(updated.Allowlist) != 1 || updated.Allowlist[0].ExternalID != testYouTubeChannelID {
 		t.Fatalf("allowlist = %+v", updated.Allowlist)
+	}
+	if sync.reconcileCalls < 2 {
+		t.Fatalf("expected reconcile on create and add, got %d", sync.reconcileCalls)
+	}
+	if len(sync.lastChannels) != 1 || sync.lastChannels[0].ExternalID != testYouTubeChannelID {
+		t.Fatalf("last reconcile channels = %+v", sync.lastChannels)
 	}
 	_, err = svc.AddChildAllowlistEntry(ctx, created.ID, AddAllowlistEntryRequest{
 		ExpectedVersion: created.AllowlistVersion,

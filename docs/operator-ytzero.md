@@ -123,12 +123,19 @@ bin/wonderfeed control serve [--config path]
 When running `wonderfeed control serve`, point `database_url` / `DATABASE_URL` at the same
 PostgreSQL database YT Zero uses (`postgresql://...@127.0.0.1:5432/ytzero`).
 The control plane persists provider-scoped allowlist CRUD in `wonderfeed.*`
-tables, then writes YT Zero `channels` / `user_channels` rows directly
-(experimental; couples to the provider schema in that database).
+tables, then reconciles YT Zero `channels` / `user_channels` rows directly
+(experimental; couples to the provider schema in that database). Reconcile
+replaces provider follows with the host allowlist and unfollows extras.
 
-Policy patches still use the HTTP adapter. Set `YTZERO_SESSION_COOKIE` only when
-YT Zero auth requires an admin session for `PATCH /api/profiles/{id}`.
-Allowlist membership does not use provider HTTP routes or child-profile cookies.
+Policy patches and **YouTube follow ownership** (YT Zero access-control denies)
+use the HTTP adapter. Set `YTZERO_SESSION_COOKIE` to a **primary-profile**
+session when YT Zero auth is enabled. The control plane uses it for
+`PATCH /api/profiles/{id}` (child policy) and `PUT /api/access-control/profiles/{id}`
+(deny `channels`, `imports`, and `followed_playlists` so children cannot widen
+YouTube channel membership on Wonderfeed-managed children). That permission lock
+is YouTube/YT Zero-specific; allowlist CRUD remains provider-scoped (`youtube`
+first). Sync fails closed when the cookie is required but missing. Allowlist
+membership reconcile does not use provider HTTP routes or child-profile cookies.
 
 ## Switching from SQLite
 
