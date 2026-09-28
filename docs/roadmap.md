@@ -106,6 +106,7 @@ Minimum host-owned capabilities (may be adapters over provider features):
 ## Milestone 4: Hardening for real devices
 
 - Document recommended device/browser lockdown for macOS, iOS, Android, and living-room browsers.
+- Capture living-room appliance hardware candidates and on-box vs off-box service split: [living-room-hardware.md](living-room-hardware.md).
 - Reduce escape hatches (outbound YouTube browsing, stock apps, unrestricted search).
 - Clarify Premium family seating and cookie requirements when using embeds.
 

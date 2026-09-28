@@ -81,7 +81,7 @@ Video bytes and player chrome remain with YouTube (embed) or optional local down
 
 ### 5. Device and network enforcement
 
-The real boundary against "open youtube.com and escape the feed." Managed child profiles, kiosk mode, app allowlists, and DNS filtering sit here. Application design can reduce escape hatches; it cannot replace OS-level controls.
+The real boundary against "open youtube.com and escape the feed." Managed child profiles, kiosk mode, app allowlists, and DNS filtering sit here. Application design can reduce escape hatches; it cannot replace OS-level controls. Living-room appliance hardware candidates and RAM/service split: [living-room-hardware.md](living-room-hardware.md).
 
 ## Integration seams (likely)
 
