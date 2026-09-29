@@ -127,7 +127,7 @@ These roadmap items are **not** covered by passing the tables above. Failing the
 | --- | --- | --- |
 | Main-feed diversity (max 1 channel / N) | Wonderfeed host | No OP/UI case yet; add `CP-*` / `UI-*` when implemented |
 | Approve new channel/video requests (non-time) | Wonderfeed host | No case yet |
-| Parent activity view (played / rejected / pending) | Wonderfeed host | No case yet |
+| Parent activity view (raw chronology) | Wonderfeed host | Deferred; superseded by [content-portfolio.md](../content-portfolio.md) vision |
 | OPML export | Optional host | Import only today (UI-001) |
 
 ---

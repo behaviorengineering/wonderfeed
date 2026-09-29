@@ -2,7 +2,7 @@
 
 Progress lives in this file: milestones **0**, **1**, and **3** use `- [x]` / `- [ ]` checklists; **2** is closed by ADR; **4** and later use the same checklist style where work is trackable. There is no separate progress dashboard; treat unchecked items as open scope.
 
-**Snapshot (2026-09):** Milestones 0–2 done. Milestone **3** is nearly complete (parent activity view still open). Milestone **4** started (living-room appliance hardware notes landed); platform lockdown guides and a one-week household trial are still open.
+**Snapshot (2026-09):** Milestones 0–2 done. Milestone **3** control plane MVP **done** (raw parent activity chronology deferred; see [content-portfolio.md](content-portfolio.md)). Milestone **4** started (living-room appliance hardware notes landed); platform lockdown guides and a one-week household trial are still open.
 
 ## Milestone 0: Scaffold (this repository state)
 
@@ -102,10 +102,10 @@ Minimum host-owned capabilities (may be adapters over provider features):
 - [x] Durable desired policy in host PostgreSQL (`wonderfeed.*`) with sync status
 - [x] Fail-closed bind: non-loopback requires `WONDERFEED_PARENT_AUTH_KEY`
 - [x] Provider-scoped channel allowlist CRUD with a versioned, exportable JSON source of truth
-- [ ] Parent activity view (what played, what was rejected, pending requests if any)
+- Parent activity view (raw chronology: what played, what was rejected, pending requests): **deferred / superseded** by taxonomy, analysis stories, and portfolio objectives in [content-portfolio.md](content-portfolio.md). Not required for M3 exit.
 - [x] Child cannot widen allowlists from the child surface (host reconcile + access-control deny; verify on household stack)
 
-**Exit gate:** a parent can change policy without editing provider source, and children cannot widen allowlists from the child surface. (Met except optional hardening: parent activity view.)
+**Exit gate:** a parent can change policy without editing provider source, and children cannot widen allowlists from the child surface. **Met.**
 
 ## Milestone 4: Hardening for real devices
 
@@ -129,7 +129,8 @@ Minimum host-owned capabilities (may be adapters over provider features):
 
 ## Later direction (not scheduled)
 
-Hosted curated library: central discovery and evaluation service that grows a shared catalog of channels and videos worth following, then drives parent/kid search suggestions from that store instead of YouTube Home. Draft: [curated-library.md](curated-library.md).
+- **Hosted curated library:** central discovery and evaluation service that grows a shared catalog of channels and videos worth following, then drives parent/kid search suggestions from that store instead of YouTube Home. Draft: [curated-library.md](curated-library.md).
+- **Content portfolio:** shared taxonomy and benchmarks, labeled allowlist content, parent-facing analysis stories, and objective-based feed allocation per profile (time of day, day of week, written goals). Draft: [content-portfolio.md](content-portfolio.md).
 
 ## Decision log
 
