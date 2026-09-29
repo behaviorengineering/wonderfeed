@@ -53,6 +53,7 @@ YouTube API terms refresh (local snapshots, gitignored): `make youtube-api-terms
 | Doc | Purpose |
 | --- | --- |
 | [docs/curated-library.md](docs/curated-library.md) | Hosted curated library, voice concierge/librarian flow, API compliance notes |
+| [docs/content-portfolio.md](docs/content-portfolio.md) | Taxonomy, analysis stories, portfolio-style feed objectives (vision) |
 | [docs/cloudflare.md](docs/cloudflare.md) | Remote HTTPS / tunnel design for homes |
 | [docs/decisions/0001-ytzero-provider.md](docs/decisions/0001-ytzero-provider.md) | Why YT Zero is the first provider |
 
@@ -66,6 +67,8 @@ make test
 make vet
 make provider-health   # when the stack is up
 ```
+
+Unit tests are not a household trial. For live-stack and browser/device checks, use [docs/testing/operational-tests.md](docs/testing/operational-tests.md) (manual first; same IDs reserved for future full regression).
 
 Prefer focused checks over inventing new mega-scripts. Use existing Makefile verbs from `make help`.
 

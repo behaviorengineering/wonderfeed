@@ -141,10 +141,15 @@ Not legal advice. Authoritative text and hashes: [legal/youtube-api/](legal/yout
 - Does not treat API search as identical to youtube.com search.
 - Training a large open-web video safety classifier as MVP remains a product-brief non-goal; start with metadata + policy-safe text signals + human review, then grow the DB.
 
+## Related vision: content portfolio
+
+This note answers **candidacy**: should a channel or video belong in the curated library or household allowlist path? A separate vision covers **allocation** within the approved library: taxonomy, benchmarks, parent-facing analysis stories, and portfolio-style feed objectives per profile and schedule. See [content-portfolio.md](content-portfolio.md). Library judgment feeds what may enter the universe; portfolio policy biases what surfaces inside it.
+
 ## Relation to existing docs
 
 | Doc | Relationship |
 | --- | --- |
+| [content-portfolio.md](content-portfolio.md) | Taxonomy, watch analysis stories, objective-based feed mix within the allowlist |
 | [product-brief.md](product-brief.md) | Parent owns the algorithm; allowlist first; push fresh trusted content |
 | [architecture.md](architecture.md) | Layers: curation vs playback vs device lockdown stay separate |
 | [cloudflare.md](cloudflare.md) | Homes stay sovereign; a central plane can exist for provisioning/catalog without publishing Postgres |
