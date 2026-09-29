@@ -12,8 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// PgAllowlistSync writes YT Zero subscription state directly in PostgreSQL.
-// Experimental: couples to the provider schema in the shared household database.
+// PgAllowlistSync writes YT Zero YouTube channel follows directly in PostgreSQL.
+// Only ProviderYouTube entries are accepted; experimental schema coupling to YT Zero.
 type PgAllowlistSync struct {
 	pool *pgxpool.Pool
 }

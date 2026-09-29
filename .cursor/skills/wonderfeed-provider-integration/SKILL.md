@@ -2,16 +2,18 @@
 name: wonderfeed-provider-integration
 description: >-
   Enforces Wonderfeed provider adapter rules for YT Zero and future providers:
-  submodule boundaries, no product spill, pin updates, and portable upstream
-  trees. Use when editing providers/, adding submodules, wrapping YT Zero, or
-  syncing provider pins.
+  submodule boundaries, no product spill, pin updates, portable upstream trees,
+  and provider-scope honesty on host control-plane APIs (pkg/provider,
+  pkg/controlplane, internal/httpapi, internal/controlplane). Use when editing
+  providers/, adding submodules, wrapping YT Zero, syncing provider pins, or
+  adding/changing parent API or adapter seams.
 ---
 
 # Wonderfeed provider integration
 
 ## When to load
 
-Load when touching `providers/`, `.gitmodules`, provider pins, host adapters around YT Zero, or any change that might edit upstream provider source for Wonderfeed product needs.
+Load when touching `providers/`, `.gitmodules`, provider pins, host adapters around YT Zero, parent control-plane HTTP or `pkg/provider` / `pkg/controlplane` APIs, or any change that might edit upstream provider source for Wonderfeed product needs.
 
 Related:
 
@@ -69,6 +71,28 @@ Violation: STOP, pin a commit, document the bump, re-verify.
 Enforcement: Design review against Milestone 2 options in `docs/roadmap.md`.
 Violation: STOP, write or update an ADR, re-verify.
 
+**CONSTRAINT:** Host control-plane and adapter APIs MUST be honest about provider scope. YouTube-only behavior MUST use YouTube-scoped names and docs; multi-provider-ready surfaces MUST use `provider` + `external_id` (or equivalent), not identifiers that imply every future provider shares YT Zero semantics.
+
+- MUST: name YouTube-only locks, sync writers, and JSON semantics with `YouTube`, `youtube`, or `provider` + `youtube` in public Go types, fields, and operator docs.
+- MUST: keep allowlist entries provider-scoped (`provider`, `external_id`); validate non-`youtube` keys fail closed until an adapter exists.
+- MUST NOT: add provider-neutral interface or field names for behavior that only YT Zero implements today (for example generic "follow ownership" without YouTube in the name).
+- MUST NOT: imply Netflix or other future providers inherit YouTube UC ids, Shorts gating, or YT Zero permission areas.
+
+Enforcement: Scan API diffs under `pkg/provider/`, `pkg/controlplane/`, `internal/httpapi/`, `internal/controlplane/`, `internal/provider/` for neutral names on YouTube-specific behavior.
+Violation: STOP, rename or scope the API, update docs, re-verify.
+
+CORRECT:
+```text
+YouTubeFollowOwnership.ApplyYouTubeFollowOwnership on the YT Zero adapter
+AllowlistChannel with provider=youtube and external_id=UC…
+```
+
+PROHIBITED:
+```text
+ChildFollowOwnership on pkg/provider/child.go for YT Zero access-control denies
+Bare channel_id in parent JSON without a provider key
+```
+
 ## Steps
 
 1. **Resolve ownership** — confirm whether the path is host or provider.
@@ -91,3 +115,7 @@ Violation: STOP, write or update an ADR, re-verify.
       Method: Documented clone command or disposable clone test.
       Pass: Provider tree populates without host files inside it.
       Fail: Fix submodule metadata → re-test.
+- [ ] **API provider scope:** New or changed control-plane API names and docs match actual provider support.
+      Method: Diff `pkg/provider`, `pkg/controlplane`, `internal/httpapi`, `internal/controlplane`, `internal/provider`.
+      Pass: YouTube-only behavior is YouTube-named; allowlist stays `provider` + `external_id`.
+      Fail: Rename or document scope → re-verify.

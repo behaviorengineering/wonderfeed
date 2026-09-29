@@ -48,7 +48,7 @@ Classifications: **implemented** (wired end-to-end), **configurable** (depends o
 | Child time limits + time grants | Yes | No | Cooperative UI lock; server reports `locked` |
 | Shorts / live gating | Mostly yes | Maybe | Live is server-enforced; set `show_shorts` with `child_hide_shorts` |
 | Subscribed-only / no open YT search | Yes (`child_local_only`) | No for basic gate | Local library search still available |
-| Child cannot widen allowlist | Partial (deny `channels`, Child Lock) | Yes for hard guarantee | PIN-unlocked child can still follow |
+| Child cannot widen allowlist | Host reconcile + access-control deny on sync | Yes for hard guarantee | Household smoke still required; device lockdown is separate |
 | Diversity (1 channel / N on main feed) | No | Yes | Discovery plugin is not the main child feed |
 | Approve new channel/video requests | No | Yes | Time requests only |
 | OPML export | No | Optional | Portable backup includes subscriptions |
@@ -99,7 +99,7 @@ Minimum host-owned capabilities (may be adapters over provider features):
 - [x] Fail-closed bind: non-loopback requires `WONDERFEED_PARENT_AUTH_KEY`
 - [x] Provider-scoped channel allowlist CRUD with a versioned, exportable JSON source of truth
 - [ ] Parent activity view (what played, what was rejected, pending requests if any)
-- [ ] Child cannot widen allowlists from the child surface (hard guarantee beyond YT Zero PIN)
+- [x] Child cannot widen allowlists from the child surface (host reconcile + access-control deny; verify on household stack)
 
 **Exit gate:** a parent can change policy without editing provider source, and children cannot widen allowlists from the child surface.
 

@@ -91,6 +91,60 @@ func TestAdapterCreateAndApplyPolicy(t *testing.T) {
 	}
 }
 
+func TestAdapterApplyYouTubeFollowOwnership(t *testing.T) {
+	t.Parallel()
+	var gotPut map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/access-control":
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"default_group_id": 1,
+				"groups": []map[string]any{
+					{"id": 2, "name": "Restricted"},
+				},
+				"profiles": []map[string]any{
+					{"id": 9, "access": map[string]any{"group_id": 1}},
+				},
+			})
+		case r.Method == http.MethodPut && r.URL.Path == "/api/access-control/profiles/9":
+			if err := json.NewDecoder(r.Body).Decode(&gotPut); err != nil {
+				t.Errorf("decode put: %v", err)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"access": map[string]any{"group_id": 2},
+			})
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+
+	a := NewAdapter(AdapterConfig{BaseURL: srv.URL, HTTP: srv.Client(), SessionCookie: "ytzero_session=test"})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := a.ApplyYouTubeFollowOwnership(ctx, "9"); err != nil {
+		t.Fatalf("apply YouTube follow ownership: %v", err)
+	}
+	if int(gotPut["group_id"].(float64)) != 2 {
+		t.Fatalf("group_id = %#v", gotPut["group_id"])
+	}
+	overrides, ok := gotPut["overrides"].(map[string]any)
+	if !ok || overrides["channels"] != "deny" || overrides["imports"] != "deny" {
+		t.Fatalf("overrides = %#v", gotPut["overrides"])
+	}
+}
+
+func TestAdapterApplyYouTubeFollowOwnershipRequiresSessionCookie(t *testing.T) {
+	t.Parallel()
+	a := NewAdapter(AdapterConfig{BaseURL: "http://example.invalid", HTTP: http.DefaultClient})
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := a.ApplyYouTubeFollowOwnership(ctx, "9"); err == nil {
+		t.Fatal("expected missing session cookie error")
+	}
+}
+
 func TestResilientClientRequiresDeadline(t *testing.T) {
 	t.Parallel()
 	c := NewResilientClient("http://example.invalid", http.DefaultClient, "")

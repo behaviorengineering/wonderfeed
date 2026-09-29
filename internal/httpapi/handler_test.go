@@ -21,9 +21,11 @@ type noopAllowlistSync struct{}
 func (noopAllowlistSync) AddMembership(ctx context.Context, providerProfileID string, channel provider.ScopedChannel) error {
 	return nil
 }
+
 func (noopAllowlistSync) RemoveMembership(ctx context.Context, providerProfileID string, channel provider.ScopedChannel) error {
 	return nil
 }
+
 func (noopAllowlistSync) ReconcileAll(ctx context.Context, providerProfileID string, channels []provider.ScopedChannel) error {
 	return nil
 }
@@ -31,11 +33,17 @@ func (noopAllowlistSync) ReconcileAll(ctx context.Context, providerProfileID str
 func (okProvider) ListChildProfiles(ctx context.Context) ([]provider.Profile, error) {
 	return nil, nil
 }
+
 func (okProvider) CreateChildProfile(ctx context.Context, name, avatarColor string) (provider.Profile, error) {
 	return provider.Profile{ID: "1", Name: name, AvatarColor: avatarColor, IsChild: true}, nil
 }
+
 func (okProvider) ApplyPolicy(ctx context.Context, providerProfileID string, policy provider.PolicyPayload) (provider.ApplyResult, error) {
 	return provider.ApplyResult{ProviderProfileID: providerProfileID}, nil
+}
+
+func (okProvider) ApplyYouTubeFollowOwnership(ctx context.Context, providerProfileID string) error {
+	return nil
 }
 
 func testHandler(t *testing.T, authKey string) http.Handler {

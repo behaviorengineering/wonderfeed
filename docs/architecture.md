@@ -61,7 +61,7 @@ flowchart TD
 
 ### 1. Curation and feed state
 
-Trusted channels, tags, automatic rules, archive/reject flows, and chronological inbox behavior. Wonderfeed owns the parent-approved allowlist in PostgreSQL as provider-scoped entries (`youtube` first) and syncs membership into the selected YT Zero child profile through an experimental host-side PostgreSQL writer. YT Zero still implements the resulting subscription inbox and playback without Google login or YouTube Data API keys. The roadmap is YouTube-first, not YouTube-only: future providers plug into the same control-plane API and curation rules.
+Trusted channels, tags, automatic rules, archive/reject flows, and chronological inbox behavior. Wonderfeed owns the parent-approved allowlist in PostgreSQL as provider-scoped entries (`youtube` first) and projects membership into the selected YT Zero child profile through an experimental host-side PostgreSQL writer (`ReconcileAll` replaces provider follows with the host list). On each profile sync the YT Zero adapter applies **YouTube follow ownership**: it denies YT Zero permission areas that widen YouTube channel membership (`channels`, `imports`, `followed_playlists`) via access-control HTTP. That lock is YouTube/YT Zero-specific today; allowlist entry shape remains provider-scoped for future catalogs. YT Zero still implements the resulting subscription inbox and playback without Google login or YouTube Data API keys. The roadmap is YouTube-first, not YouTube-only: future providers plug into the same control-plane API and curation rules.
 
 ### 2. Parent approval and policy
 
@@ -102,9 +102,8 @@ Host control-plane persistence lives in PostgreSQL schema `wonderfeed` (migratio
 - Privacy-enhanced (`youtube-nocookie`) embeds conflict with reliable Premium session recognition. Prefer ordinary `youtube.com` embeds when Premium is required.
 - Third-party frontends that avoid Google login generally cannot inherit YouTube Premium entitlements.
 - YT Zero is a strong foundation for "manage your own algorithm," not a complete substitute for OS lockdown.
-- Allowlist sync is experimental and schema-coupled: it requires the household PostgreSQL DSN used by both Wonderfeed and YT Zero (`DATABASE_URL`). Policy patches may still use `YTZERO_SESSION_COOKIE` when HTTP auth is enabled.
-- Preventing a child from widening the allowlist inside the provider UI remains
-  a separate enforcement problem (permissions, child lock, and future host UI).
+- Allowlist sync is experimental and schema-coupled: it requires the household PostgreSQL DSN used by both Wonderfeed and YT Zero (`DATABASE_URL`). Policy patches and YouTube follow-ownership (access-control) denies use the HTTP adapter and require a primary-profile `YTZERO_SESSION_COOKIE` when YT Zero auth is enabled; sync fails closed when that cookie is missing.
+- Device lockdown and a future Wonderfeed child UI remain layers above provider permissions; they do not replace host-owned follows.
 
 ## Deferred decisions
 

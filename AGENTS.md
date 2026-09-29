@@ -17,7 +17,7 @@ Wonderfeed is the **host product**. Provider code lives under `providers/` as se
 | --- | --- |
 | Product scope, naming, parent/child roles | [.cursor/skills/wonderfeed-product-context/SKILL.md](.cursor/skills/wonderfeed-product-context/SKILL.md) |
 | Allowlist, fail-closed, child surface, embeds honesty | [.cursor/skills/wonderfeed-content-policy/SKILL.md](.cursor/skills/wonderfeed-content-policy/SKILL.md) |
-| Editing `providers/`, pins, no product spill | [.cursor/skills/wonderfeed-provider-integration/SKILL.md](.cursor/skills/wonderfeed-provider-integration/SKILL.md) |
+| Editing `providers/`, pins, no product spill, control-plane API scope | [.cursor/skills/wonderfeed-provider-integration/SKILL.md](.cursor/skills/wonderfeed-provider-integration/SKILL.md) |
 | `make serve`, Postgres, compose, backups, health | [.cursor/skills/wonderfeed-ytzero-ops/SKILL.md](.cursor/skills/wonderfeed-ytzero-ops/SKILL.md) |
 
 Shared pack skills (golang-quality, process-compose-docker, and so on) live under `.cursor/packs/shared/` and are soft-linked into `.cursor/skills/`. Edit packs only via [edit-cursor-packs](.cursor/skills/edit-cursor-packs/SKILL.md).
@@ -68,6 +68,8 @@ make provider-health   # when the stack is up
 ```
 
 Prefer focused checks over inventing new mega-scripts. Use existing Makefile verbs from `make help`.
+
+When reviewing or checking Go on control-plane API packages (`pkg/provider`, `pkg/controlplane`, `internal/httpapi`, `internal/controlplane`, `internal/provider`), Stage 5 review also applies the provider-scope API checklist in `wonderfeed-provider-integration` (see `.cursor/rules/wonderfeed-api-provider-scope.mdc`).
 
 ## Git practice for agents
 

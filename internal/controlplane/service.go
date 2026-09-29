@@ -264,31 +264,22 @@ func (s *Service) ForceSync(ctx context.Context, id string) (ChildProfile, error
 	return s.syncProfile(ctx, op, pending)
 }
 
-func (s *Service) syncAllowlistMutation(ctx context.Context, op string, profile ChildProfile, entry AllowlistChannel, add bool) (ChildProfile, error) {
+func (s *Service) syncAllowlistMutation(ctx context.Context, op string, profile ChildProfile, _ AllowlistChannel, _ bool) (ChildProfile, error) {
 	profile, err := s.ensureProviderProfile(ctx, op, profile)
 	if err != nil {
 		return profile, err
 	}
-	if s.allowlistSync == nil {
-		return s.store.RecordSyncStatus(ctx, profile.ID, SyncSynced, "")
-	}
-	scoped := entry.ToProviderScoped()
-	var syncErr error
-	if add {
-		syncErr = s.allowlistSync.AddMembership(ctx, profile.ProviderProfileID, scoped)
-	} else {
-		syncErr = s.allowlistSync.RemoveMembership(ctx, profile.ProviderProfileID, scoped)
-	}
-	if syncErr != nil {
-		s.logger.Error("provider allowlist mutation failed", "op", op, "child_id", profile.ID, "err", syncErr)
-		updated, recErr := s.store.RecordSyncStatus(ctx, profile.ID, SyncFailed, syncErr.Error())
+	if err := s.reconcileProviderAllowlist(ctx, op, profile); err != nil {
+		s.logger.Error("provider allowlist reconcile failed", "op", op, "child_id", profile.ID, "err", err)
+		updated, recErr := s.store.RecordSyncStatus(ctx, profile.ID, SyncFailed, err.Error())
 		if recErr != nil {
 			return profile, apperr.Wrap(recErr, apperr.CodeFailed, op, "record sync failure")
 		}
-		updated.Allowlist, err = s.store.ListAllowlist(ctx, profile.ID)
-		if err != nil {
-			return updated, apperr.Wrap(err, apperr.CodeFailed, op, "load allowlist")
+		allowlist, listErr := s.store.ListAllowlist(ctx, profile.ID)
+		if listErr != nil {
+			return updated, apperr.Wrap(listErr, apperr.CodeFailed, op, "load allowlist")
 		}
+		updated.Allowlist = allowlist
 		return updated, nil
 	}
 	updated, err := s.store.RecordSyncStatus(ctx, profile.ID, SyncSynced, "")
@@ -307,19 +298,21 @@ func (s *Service) syncProfile(ctx context.Context, op string, profile ChildProfi
 	if err != nil {
 		return profile, err
 	}
-	if s.allowlistSync != nil {
-		allowlist, err := s.store.ListAllowlist(ctx, profile.ID)
-		if err != nil {
-			return ChildProfile{}, apperr.Wrap(err, codeOf(err, apperr.CodeFailed), op, "load allowlist")
+	if err := s.reconcileProviderAllowlist(ctx, op, profile); err != nil {
+		s.logger.Error("provider allowlist reconcile failed", "op", op, "child_id", profile.ID, "err", err)
+		updated, recErr := s.store.RecordSyncStatus(ctx, profile.ID, SyncFailed, err.Error())
+		if recErr != nil {
+			return profile, apperr.Wrap(recErr, apperr.CodeFailed, op, "record sync failure")
 		}
-		if err := s.allowlistSync.ReconcileAll(ctx, profile.ProviderProfileID, toProviderScopedAllowlist(allowlist)); err != nil {
-			s.logger.Error("provider allowlist reconcile failed", "op", op, "child_id", profile.ID, "err", err)
-			updated, recErr := s.store.RecordSyncStatus(ctx, profile.ID, SyncFailed, err.Error())
-			if recErr != nil {
-				return profile, apperr.Wrap(recErr, apperr.CodeFailed, op, "record sync failure")
-			}
-			return updated, nil
+		return updated, nil
+	}
+	if err := s.applyYouTubeFollowOwnership(ctx, op, profile); err != nil {
+		s.logger.Error("provider YouTube follow ownership failed", "op", op, "child_id", profile.ID, "err", err)
+		updated, recErr := s.store.RecordSyncStatus(ctx, profile.ID, SyncFailed, err.Error())
+		if recErr != nil {
+			return profile, apperr.Wrap(recErr, apperr.CodeFailed, op, "record sync failure")
 		}
+		return updated, nil
 	}
 	apply, err := s.provider.ApplyPolicy(ctx, profile.ProviderProfileID, toProviderPolicy(profile.Policy))
 	if err != nil {
@@ -338,6 +331,31 @@ func (s *Service) syncProfile(ctx context.Context, op string, profile ChildProfi
 		return ChildProfile{}, apperr.Wrap(err, apperr.CodeFailed, op, "record sync success")
 	}
 	return updated, nil
+}
+
+func (s *Service) reconcileProviderAllowlist(ctx context.Context, op string, profile ChildProfile) error {
+	if s.allowlistSync == nil {
+		return nil
+	}
+	allowlist, err := s.store.ListAllowlist(ctx, profile.ID)
+	if err != nil {
+		return apperr.Wrap(err, codeOf(err, apperr.CodeFailed), op, "load allowlist")
+	}
+	if err := s.allowlistSync.ReconcileAll(ctx, profile.ProviderProfileID, toProviderScopedAllowlist(allowlist)); err != nil {
+		return apperr.Wrap(err, codeOf(err, apperr.CodeFailed), op, "reconcile allowlist")
+	}
+	return nil
+}
+
+func (s *Service) applyYouTubeFollowOwnership(ctx context.Context, op string, profile ChildProfile) error {
+	youtubeOwnership, ok := s.provider.(provider.YouTubeFollowOwnership)
+	if !ok {
+		return nil
+	}
+	if err := youtubeOwnership.ApplyYouTubeFollowOwnership(ctx, profile.ProviderProfileID); err != nil {
+		return apperr.Wrap(err, codeOf(err, apperr.CodeFailed), op, "apply YouTube follow ownership")
+	}
+	return nil
 }
 
 func (s *Service) ensureProviderProfile(ctx context.Context, op string, profile ChildProfile) (ChildProfile, error) {
