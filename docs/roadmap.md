@@ -1,5 +1,9 @@
 # Wonderfeed roadmap
 
+Progress lives in this file: milestones **0**, **1**, and **3** use `- [x]` / `- [ ]` checklists; **2** is closed by ADR; **4** and later use the same checklist style where work is trackable. There is no separate progress dashboard; treat unchecked items as open scope.
+
+**Snapshot (2026-09):** Milestones 0–2 done. Milestone **3** is nearly complete (parent activity view still open). Milestone **4** started (living-room appliance hardware notes landed); platform lockdown guides and a one-week household trial are still open.
+
 ## Milestone 0: Scaffold (this repository state)
 
 - [x] Public host repository `behaviorengineering/wonderfeed`
@@ -71,7 +75,7 @@ Verified against the live host stack (`make provider-health`, pin `19b5b61`, `"d
 
 Still deferred to a household trial: import a small trusted set, create a child profile, and walk lock UX / Shorts tab / live block in the browser.
 
-Operator runbook: [operator-ytzero.md](operator-ytzero.md).
+Operator runbook: [operator-ytzero.md](operator-ytzero.md). Step-by-step cases (manual now; automation backlog): [testing/operational-tests.md](testing/operational-tests.md).
 
 ## Milestone 2: Choose the integration shape
 
@@ -101,14 +105,15 @@ Minimum host-owned capabilities (may be adapters over provider features):
 - [ ] Parent activity view (what played, what was rejected, pending requests if any)
 - [x] Child cannot widen allowlists from the child surface (host reconcile + access-control deny; verify on household stack)
 
-**Exit gate:** a parent can change policy without editing provider source, and children cannot widen allowlists from the child surface.
+**Exit gate:** a parent can change policy without editing provider source, and children cannot widen allowlists from the child surface. (Met except optional hardening: parent activity view.)
 
 ## Milestone 4: Hardening for real devices
 
-- Document recommended device/browser lockdown for macOS, iOS, Android, and living-room browsers.
-- Capture living-room appliance hardware candidates and on-box vs off-box service split: [living-room-hardware.md](living-room-hardware.md).
-- Reduce escape hatches (outbound YouTube browsing, stock apps, unrestricted search).
-- Clarify Premium family seating and cookie requirements when using embeds.
+- [ ] Document recommended device/browser lockdown for macOS, iOS, Android, and living-room browsers (living-room stack partially covered in hardware doc below).
+- [x] Capture living-room appliance hardware candidates and on-box vs off-box service split: [living-room-hardware.md](living-room-hardware.md) (includes kiosk pin, Windows dual-monitor smoke test, optional Reachy / RustDesk notes).
+- [ ] Reduce escape hatches (outbound YouTube browsing, stock apps, unrestricted search).
+- [ ] Clarify Premium family seating and cookie requirements when using embeds.
+- [ ] Run one-week household trial without relying on "please don't open YouTube."
 
 **Exit gate:** a trial family runs for one week without relying on "please don't open YouTube."
 

@@ -67,6 +67,8 @@ make vet
 make provider-health   # when the stack is up
 ```
 
+Unit tests are not a household trial. For live-stack and browser/device checks, use [docs/testing/operational-tests.md](docs/testing/operational-tests.md) (manual first; same IDs reserved for future full regression).
+
 Prefer focused checks over inventing new mega-scripts. Use existing Makefile verbs from `make help`.
 
 When reviewing or checking Go on control-plane API packages (`pkg/provider`, `pkg/controlplane`, `internal/httpapi`, `internal/controlplane`, `internal/provider`), Stage 5 review also applies the provider-scope API checklist in `wonderfeed-provider-integration` (see `.cursor/rules/wonderfeed-api-provider-scope.mdc`).

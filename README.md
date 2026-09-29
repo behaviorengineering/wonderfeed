@@ -42,5 +42,6 @@ Details: [curated-library.md](docs/curated-library.md), [roadmap.md](docs/roadma
 - [Roadmap](docs/roadmap.md)
 - [Curated library (vision)](docs/curated-library.md)
 - [Operator runbook](docs/operator-ytzero.md)
+- [Operational tests](docs/testing/operational-tests.md)
 - [Remote access](docs/cloudflare.md)
 - [Copilot guide](AGENTS.md)
