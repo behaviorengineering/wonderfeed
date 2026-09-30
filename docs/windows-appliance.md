@@ -5,7 +5,7 @@
 | Repo | Role |
 | --- | --- |
 | [behaviorengineering/wonderfeed](https://github.com/behaviorengineering/wonderfeed) (this tree) | Product: CLI, control plane, `deploy/ytzero` overlay sources, docs |
-| **wonderfeed-local** (`gitlab.com/xynova/wonderfeed-local`, private) | Appliance CD: `images.env`, compose, `go run ./cmd/wonderfeed-local deploy`, Edge kiosk runbook |
+| **wonderfeed-local** ([gitlab.com/mindhoc/wonderfeed-local](https://gitlab.com/mindhoc/wonderfeed-local), private) | Appliance CD: `images.env`, compose, `go run ./cmd/wonderfeed-local deploy`, Edge kiosk runbook |
 
 Develop on Mac with `make serve` / `make provider-up` ([operator-ytzero.md](operator-ytzero.md)). Ship to the Windows PC through wonderfeed-local pipelines (`deploy:windows`, runner tag `windows-home`).
 
