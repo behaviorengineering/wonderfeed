@@ -54,6 +54,7 @@ YouTube API terms refresh (local snapshots, gitignored): `make youtube-api-terms
 | --- | --- |
 | [docs/curated-library.md](docs/curated-library.md) | Hosted curated library, voice concierge/librarian flow, API compliance notes |
 | [docs/content-portfolio.md](docs/content-portfolio.md) | Taxonomy, analysis stories, portfolio-style feed objectives (vision) |
+| [docs/windows-appliance.md](docs/windows-appliance.md) | Windows TV appliance; deploy via private GitLab wonderfeed-local |
 | [docs/cloudflare.md](docs/cloudflare.md) | Remote HTTPS / tunnel design for homes |
 | [docs/decisions/0001-ytzero-provider.md](docs/decisions/0001-ytzero-provider.md) | Why YT Zero is the first provider |
 

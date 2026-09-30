@@ -160,4 +160,4 @@ After changing `deploy/ytzero/src-overlay/`, re-run `make provider-image` (or `m
 - MUST NOT publish PostgreSQL through Cloudflare Tunnel (app HTTPS only; see [`cloudflare.md`](cloudflare.md)).
 - Prefer this process boundary (HTTP + Docker) over linking host Go into the Bun app (AGPL).
 
-See also: [architecture.md](architecture.md), [decisions/0001-ytzero-provider.md](decisions/0001-ytzero-provider.md), [testing/operational-tests.md](testing/operational-tests.md) (household verification checklist), `.cursor/skills/wonderfeed-ytzero-ops/`.
+See also: [architecture.md](architecture.md), [decisions/0001-ytzero-provider.md](decisions/0001-ytzero-provider.md), [windows-appliance.md](windows-appliance.md) (GitLab wonderfeed-local deploy), [testing/operational-tests.md](testing/operational-tests.md) (household verification checklist), `.cursor/skills/wonderfeed-ytzero-ops/`.

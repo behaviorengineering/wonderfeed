@@ -109,7 +109,7 @@ Minimum host-owned capabilities (may be adapters over provider features):
 
 ## Milestone 4: Hardening for real devices
 
-- [ ] Document recommended device/browser lockdown for macOS, iOS, Android, and living-room browsers (living-room stack partially covered in hardware doc below).
+- [ ] Document recommended device/browser lockdown for macOS, iOS, Android, and living-room browsers (living-room stack partially covered in hardware doc below; Windows appliance CD in [windows-appliance.md](windows-appliance.md) + wonderfeed-local).
 - [x] Capture living-room appliance hardware candidates and on-box vs off-box service split: [living-room-hardware.md](living-room-hardware.md) (includes kiosk pin, Windows dual-monitor smoke test, optional Reachy / RustDesk notes).
 - [ ] Reduce escape hatches (outbound YouTube browsing, stock apps, unrestricted search).
 - [ ] Clarify Premium family seating and cookie requirements when using embeds.

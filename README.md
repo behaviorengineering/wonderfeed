@@ -44,5 +44,6 @@ Details: [curated-library.md](docs/curated-library.md), [roadmap.md](docs/roadma
 - [Content portfolio (vision)](docs/content-portfolio.md)
 - [Operator runbook](docs/operator-ytzero.md)
 - [Operational tests](docs/testing/operational-tests.md)
+- [Windows appliance](docs/windows-appliance.md)
 - [Remote access](docs/cloudflare.md)
 - [Copilot guide](AGENTS.md)
