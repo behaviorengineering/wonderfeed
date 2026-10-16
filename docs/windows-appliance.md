@@ -19,7 +19,7 @@ Household `config.yaml`, `.env.deploy`, Postgres passwords, and session cookies 
 2. `wonderfeed control migrate up` and `wonderfeed control serve` on the host (product CLI).
 3. Edge kiosk on `http://127.0.0.1:3001` (wonderfeed-local `docs/kiosk.md`).
 
-Image pins and on-runner src-patch build: wonderfeed-local `images.env` (`POSTGRES_IMAGE`, `YTZERO_BASE_IMAGE`, `YTZERO_SRC_PATCH_IMAGE`). Set `WONDERFEED_PRODUCT_DIR` to a product git checkout on the Windows host.
+Image pins and on-runner src-patch build: wonderfeed-local `images.env` plus product gitlink `providers/wonderfeed` (same shape as polypus-local `providers/polypus`). Optional override: `WONDERFEED_PRODUCT_DIR`.
 
 ## Validation
 
