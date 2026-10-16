@@ -52,6 +52,9 @@ A first useful release is successful when:
 | Child surface | The locked-down presentation children use to watch |
 | Allowlist | Explicit set of provider-scoped sources (for example YouTube channels) and/or videos permitted to play |
 | Feed policy | Rules that shape order, diversity, format filters, and session length |
+| Taxonomy | Wonderfeed-owned labels on channels and videos used for analysis and feed policy (vision) |
+| Content portfolio | Per-profile target mix and schedule over taxonomy dimensions within the allowlist (vision) |
+| Feed objectives | Written parent goals compiled into portfolio weights and feed policy constraints (vision) |
 | Video provider | Upstream catalog and playback system (YouTube via YT Zero first; others later behind the same control-plane API) |
 
 ## Canonical references
@@ -60,4 +63,5 @@ A first useful release is successful when:
 - Roadmap: [roadmap.md](roadmap.md)
 - Provider decision: [decisions/0001-ytzero-provider.md](decisions/0001-ytzero-provider.md)
 - Hosted curated library (vision): [curated-library.md](curated-library.md)
+- Content portfolio and analysis stories (vision): [content-portfolio.md](content-portfolio.md)
 - Upstream YT Zero: https://github.com/Pelski/ytzero

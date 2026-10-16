@@ -372,6 +372,7 @@ Aligns with household networking in [cloudflare.md](cloudflare.md): the applianc
 
 ## Related
 
+- Windows appliance CD (two-repo): [windows-appliance.md](windows-appliance.md) and private **wonderfeed-local** (`docs/kiosk.md` there)
 - Roadmap Milestone 4: [roadmap.md](roadmap.md)
 - Household box / tunnel shape: [cloudflare.md](cloudflare.md)
 - Provider local ops: [operator-ytzero.md](operator-ytzero.md)
